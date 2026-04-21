@@ -237,15 +237,16 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
     transfers: payload.rolling_volumes.transfers_to_other_ed[i],
   }));
 
-  // Group dispositions by bucket for nesting display
-  const groupedDispositions = useMemo(() => {
-    const byBucket = new Map<string, typeof payload.disposition_breakdown>();
+  // Roll up every disposition row into its parent bucket for the breakdown table
+  const BUCKET_ORDER = ["ADMIT", "DISCHARGE", "LWBS", "ED TO ED TRANSFER", "OTHER"];
+  const bucketTotals = useMemo(() => {
+    const totals = new Map<string, number>(BUCKET_ORDER.map((b) => [b, 0]));
     for (const row of payload.disposition_breakdown) {
-      if (!byBucket.has(row.bucket)) byBucket.set(row.bucket, []);
-      byBucket.get(row.bucket)!.push(row);
+      totals.set(row.bucket, (totals.get(row.bucket) ?? 0) + row.total);
     }
-    return byBucket;
+    return BUCKET_ORDER.map((bucket) => ({ bucket, total: totals.get(bucket) ?? 0 }));
   }, [payload.disposition_breakdown]);
+  const grandTotal = bucketTotals.reduce((s, r) => s + r.total, 0);
 
   return (
     <div className="space-y-6">
@@ -338,51 +339,40 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
       <Card
         num="03"
         title="Disposition Breakdown (Rolling Month)"
-        sub="Every Final ED Disposition grouped by parent bucket. Totals aggregate across 31 days."
+        sub="Rolling 31-day totals for each disposition bucket, as a share of all encounters."
       >
-        <div className="space-y-5">
-          {["ADMIT", "DISCHARGE", "LWBS", "ED TO ED TRANSFER", "OTHER"].map((bucket) => {
-            const rows = groupedDispositions.get(bucket) ?? [];
-            if (!rows.length) return null;
-            const bucketTotal = rows.reduce((s, r) => s + r.total, 0);
-            return (
-              <div key={bucket}>
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <h4 className="font-mono text-[11px] uppercase tracking-[0.12em] text-slate-600">
-                    {bucket}
-                  </h4>
-                  <span className="font-mono text-[11px] text-slate-500">
-                    31-day total: <span className="font-semibold text-slate-900">{fmtInt(bucketTotal)}</span>
-                  </span>
-                </div>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Disposition</th>
-                      <th className="text-right">Total</th>
-                      <th className="text-right">Avg/Day</th>
-                      <th className="text-right">% of Bucket</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.disposition}>
-                        <td className="font-medium text-slate-900">{r.disposition}</td>
-                        <td className="text-right num">{fmtInt(r.total)}</td>
-                        <td className="text-right num text-slate-500">
-                          {fmtDec(r.total / 31, 1)}
-                        </td>
-                        <td className="text-right num text-slate-500">
-                          {bucketTotal > 0 ? ((100 * r.total) / bucketTotal).toFixed(1) : "0.0"}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
-        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Disposition Bucket</th>
+              <th className="text-right">31-day Total</th>
+              <th className="text-right">Avg / Day</th>
+              <th className="text-right">% of Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bucketTotals.map((r) => (
+              <tr key={r.bucket}>
+                <td className="font-medium text-slate-900">{r.bucket}</td>
+                <td className="text-right num">{fmtInt(r.total)}</td>
+                <td className="text-right num text-slate-500">
+                  {fmtDec(r.total / 31, 1)}
+                </td>
+                <td className="text-right num text-slate-500">
+                  {grandTotal > 0 ? ((100 * r.total) / grandTotal).toFixed(1) : "0.0"}%
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-slate-300">
+              <td className="font-semibold text-slate-900">TOTAL</td>
+              <td className="text-right num font-semibold">{fmtInt(grandTotal)}</td>
+              <td className="text-right num font-semibold text-slate-500">
+                {fmtDec(grandTotal / 31, 1)}
+              </td>
+              <td className="text-right num font-semibold text-slate-500">100.0%</td>
+            </tr>
+          </tbody>
+        </table>
       </Card>
     </div>
   );
