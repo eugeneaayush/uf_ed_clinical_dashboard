@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BarChart,
@@ -42,6 +43,18 @@ import {
 export function Summary() {
   const { data, loading, error } = useSummary();
   const meta = useMeta();
+  const nav = useNavigate();
+
+  const condNameToSlug = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of meta.data?.conditions ?? []) m.set(c.name, c.slug);
+    return m;
+  }, [meta.data]);
+
+  const drillToCondition = (label: string | undefined) => {
+    const slug = label ? condNameToSlug.get(label) : undefined;
+    if (slug) nav(`/conditions/${slug}`);
+  };
 
   if (loading || !data) return <LoadingDots />;
   if (error) return <ErrorState error={error} />;
@@ -270,9 +283,17 @@ export function Summary() {
                   axisLine={false}
                   width={180}
                   tickFormatter={(v) => truncate(v, 26)}
+                  onClick={(e: { value?: string }) => drillToCondition(e?.value)}
+                  style={{ cursor: "pointer" }}
                 />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f1f5f9" }} />
-                <Bar dataKey="value" fill="#0021A5" radius={[0, 6, 6, 0]} />
+                <Bar
+                  dataKey="value"
+                  fill="#0021A5"
+                  radius={[0, 6, 6, 0]}
+                  style={{ cursor: "pointer" }}
+                  onClick={(d: { label?: string }) => drillToCondition(d?.label)}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
