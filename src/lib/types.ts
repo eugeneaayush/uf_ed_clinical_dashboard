@@ -25,6 +25,7 @@ export interface Meta {
   total_encounters: number;
   unique_patients: number;
   unique_attendings: number;
+  lwbs_count: number;
   conditions: ConditionRef[];
 }
 

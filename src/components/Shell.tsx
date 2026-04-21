@@ -99,8 +99,8 @@ export function Shell() {
                     value={fmtInt(meta.data.unique_patients)}
                   />
                   <HeroStat
-                    label="Attendings"
-                    value={fmtInt(meta.data.unique_attendings)}
+                    label="LWBS"
+                    value={fmtInt(meta.data.lwbs_count)}
                   />
                 </div>
               )}

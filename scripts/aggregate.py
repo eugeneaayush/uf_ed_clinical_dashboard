@@ -1529,6 +1529,7 @@ def build_meta(df: pd.DataFrame, top_conditions: list[str]) -> dict[str, Any]:
         "total_encounters": int(len(df)),
         "unique_patients": int(df["MRN (UF)"].nunique()),
         "unique_attendings": int(df["Attending MD"].nunique()),
+        "lwbs_count": int((df["LWBS Flag"] == "Y").sum()),
         "conditions": [{"name": c, "slug": slugify(c)} for c in top_conditions],
     }
 
