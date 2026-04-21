@@ -710,14 +710,14 @@ def build_summary_payload(df: pd.DataFrame, top_conditions: list[str]) -> dict[s
     discharges = int(df["is_discharge"].sum())
     inpatients = admits
     ed_patients = n
-    outpatients = discharges + int(df["is_transfer"].sum())
+    readmits_72h = int(df["return_72h"].sum())
 
     # Oracle-style KPI row
     kpis = [
         {"label": "Patients", "value": int(df["MRN (UF)"].nunique()), "link": None},
         {"label": "Inpatients", "value": inpatients, "link": "admit-rate"},
         {"label": "ED Patients", "value": ed_patients, "link": "encounters"},
-        {"label": "Outpatients", "value": outpatients, "link": "return-72h"},
+        {"label": "72-Hr. Readmits", "value": readmits_72h, "link": "return-72h"},
         {"label": "Discharges", "value": discharges, "link": None},
     ]
 
