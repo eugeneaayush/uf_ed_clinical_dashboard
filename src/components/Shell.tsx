@@ -53,16 +53,11 @@ export function Shell() {
             {/* Top row: wordmark + data range */}
             <div className="flex items-start justify-between gap-6">
               <div className="flex items-center gap-4">
-                {/* Official UF Emergency Medicine 2-line brand lockup.
-                   Rendered on a white chip so blue+orange elements stay
-                   legible against the gridded-blue hero. */}
-                <div className="rounded-xl bg-white px-3 py-2 shadow-pop flex items-center">
-                  <img
-                    src="/em-logo.png"
-                    alt="UF Emergency Medicine"
-                    className="h-8 md:h-9 w-auto"
-                  />
-                </div>
+                <img
+                  src="/em-logo.png"
+                  alt="UF Emergency Medicine"
+                  className="h-10 md:h-12 w-auto"
+                />
               </div>
 
               {meta.data && (
