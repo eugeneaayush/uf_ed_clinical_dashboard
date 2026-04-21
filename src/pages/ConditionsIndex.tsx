@@ -15,6 +15,10 @@ interface ConditionRow {
   admit_rate_pct: number;
   lwbs_rate_pct: number;
   lbtc_rate_pct: number;
+  return_72h_any_pct: number;
+  return_72h_same_pct: number;
+  return_7d_any_pct: number;
+  return_7d_same_pct: number;
   return_30d_any_pct: number;
   return_30d_same_pct: number;
   median_ed_los_min: number | null;
@@ -26,6 +30,10 @@ type SortKey =
   | "admit_rate_pct"
   | "lwbs_rate_pct"
   | "lbtc_rate_pct"
+  | "return_72h_any_pct"
+  | "return_72h_same_pct"
+  | "return_7d_any_pct"
+  | "return_7d_same_pct"
   | "return_30d_any_pct"
   | "return_30d_same_pct"
   | "median_ed_los_min";
@@ -98,6 +106,10 @@ function ConditionsTable({
         admit_rate_pct: d.kpis.admit_rate_pct,
         lwbs_rate_pct: d.kpis.lwbs_rate_pct,
         lbtc_rate_pct: d.kpis.lbtc_rate_pct,
+        return_72h_any_pct: d.kpis.return_72h_any_pct,
+        return_72h_same_pct: d.kpis.return_72h_same_pct,
+        return_7d_any_pct: d.kpis.return_7d_any_pct,
+        return_7d_same_pct: d.kpis.return_7d_same_pct,
         return_30d_any_pct: d.kpis.return_30d_any_pct,
         return_30d_same_pct: d.kpis.return_30d_same_pct,
         median_ed_los_min: d.kpis.median_ed_los_min,
@@ -133,6 +145,10 @@ function ConditionsTable({
             <SortTh k="median_ed_los_min" label="Median LOS" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
             <SortTh k="lwbs_rate_pct" label="LWBS %" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
             <SortTh k="lbtc_rate_pct" label="LBTC %" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
+            <SortTh k="return_72h_any_pct" label="72-hr Return (any)" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
+            <SortTh k="return_72h_same_pct" label="72-hr Return (same Dx)" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
+            <SortTh k="return_7d_any_pct" label="7-day Return (any)" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
+            <SortTh k="return_7d_same_pct" label="7-day Return (same Dx)" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
             <SortTh k="return_30d_any_pct" label="30-day Return (any)" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
             <SortTh k="return_30d_same_pct" label="30-day Return (same Dx)" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
           </tr>
@@ -199,6 +215,18 @@ function ConditionRowView({ row }: { row: ConditionRow }) {
       <td className="text-right num">{fmtMinutes(row.median_ed_los_min)}</td>
       <td className="text-right num">{fmtPct(row.lwbs_rate_pct)}</td>
       <td className="text-right num">{fmtPct(row.lbtc_rate_pct)}</td>
+      <td className="text-right num font-semibold text-uf-orange">
+        {fmtPct(row.return_72h_any_pct)}
+      </td>
+      <td className="text-right num font-semibold text-uf-blue">
+        {fmtPct(row.return_72h_same_pct)}
+      </td>
+      <td className="text-right num font-semibold text-uf-orange">
+        {fmtPct(row.return_7d_any_pct)}
+      </td>
+      <td className="text-right num font-semibold text-uf-blue">
+        {fmtPct(row.return_7d_same_pct)}
+      </td>
       <td className="text-right num font-semibold text-uf-orange">
         {fmtPct(row.return_30d_any_pct)}
       </td>
