@@ -1,0 +1,34 @@
+{
+  "name": "uf-ed-clinical-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "UF Department of Emergency Medicine — Clinical Dashboard (React SPA, Firebase-hosted)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "aggregate": "python scripts/aggregate.py --encounters data_raw/BO_data_pull.csv --out public/data",
+    "deploy": "npm run build && firebase deploy --only hosting"
+  },
+  "dependencies": {
+    "@types/node": "^25.6.0",
+    "clsx": "^2.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.2",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2",
+    "vite": "^8.0.9"
+  }
+}
