@@ -57,7 +57,13 @@ EMS_ARRIVAL_MODES = {"AMBULANCE", "HELICOPTER", "FIRE DEPARTMENT"}
 LWBS_DISPOSITIONS = {"LWBS AFTER TRIAGE", "LWBS BEFORE TRIAGE"}
 LBTC_DISPOSITIONS = {"LEFT DURING TREATMENT"}
 AMA_DISPOSITIONS = {"AMA"}
-ADMIT_DISPOSITIONS = {"ADMIT", "PRESENTED TO ADMIT SERVICE", "TO L&D"}
+ADMIT_DISPOSITIONS = {"ADMIT"}
+# Synonyms folded into "ADMIT" at load time (see load_encounters).
+ADMIT_DISPOSITION_ALIASES = {
+    "PRESENTED TO ADMIT SERVICE",
+    "TO PROCEDURE/INTERVENTION",
+    "TO L&D",
+}
 TRANSFER_DISPOSITIONS = {
     "ED TRANSFER TO ADULT ED", "ED TRANSFER TO PEDS ED",
     "TRANSFER TO PSYCHIATRIC FACILITY", "TRANSFER TO ANOTHER FACILITY",
@@ -415,6 +421,7 @@ def load_encounters(path: Path) -> pd.DataFrame:
     df["ED Location"] = df["ED Location"].fillna("Unknown").str.strip()
     df["Acuity"] = df["Acuity"].fillna("Unknown").str.strip().replace("?", "Unknown")
     df["Final ED Disposition"] = df["Final ED Disposition"].fillna("Unknown").str.strip()
+    df.loc[df["Final ED Disposition"].isin(ADMIT_DISPOSITION_ALIASES), "Final ED Disposition"] = "ADMIT"
     df["ICD-10 Condition Category"] = df["ICD-10 Condition Category"].fillna("Other/Uncategorized").str.strip()
     df["Arrival Mode Type"] = df["Arrival Mode Type"].fillna("Unknown").str.strip()
     df["Action Financial Class"] = df["Action Financial Class"].fillna("Unknown").str.strip()
@@ -1061,7 +1068,7 @@ def _disposition_breakdown_daily(
     emit one row per disposition with a daily series across `dates`.
     """
     buckets = [
-        ("ADMIT", ["ADMIT", "PRESENTED TO ADMIT SERVICE", "TO PROCEDURE/INTERVENTION", "TO L&D"]),
+        ("ADMIT", ["ADMIT"]),
         ("DISCHARGE", [
             "AMA", "CHEST PAIN UNIT", "DISCHARGE", "EXPIRED",
             "LEFT DURING TREATMENT",
