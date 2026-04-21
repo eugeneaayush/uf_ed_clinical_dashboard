@@ -35,6 +35,7 @@ import argparse
 import json
 import logging
 import re
+import shutil
 import sys
 import unicodedata
 from dataclasses import dataclass, field
@@ -475,6 +476,12 @@ def load_encounters(path: Path) -> pd.DataFrame:
     df["hour"] = df["Arrival DateTime"].dt.hour
     df["dow"] = df["Arrival DateTime"].dt.dayofweek
 
+    # Fiscal-year period columns (UF FY: Jul 1 -> Jun 30).
+    # Jul-Dec of year N belong to FY(N+1); Jan-Jun of year N belong to FY(N).
+    dt = df["Arrival DateTime"]
+    df["fiscal_year"] = (dt.dt.year + (dt.dt.month >= 7).astype(int)).astype("Int16")
+    df["fy_quarter"] = (((dt.dt.month - 7) % 12) // 3 + 1).astype("Int8")
+
     # Disposition flags (used by multiple metrics)
     df["is_lwbs"] = df["Final ED Disposition"].isin(LWBS_DISPOSITIONS)
     df["is_lbtc"] = df["Final ED Disposition"].isin(LBTC_DISPOSITIONS)
@@ -549,6 +556,26 @@ def _monthly_aggregate(df: pd.DataFrame, metric: Metric) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("year_month")
 
 
+def _quarterly_aggregate(df: pd.DataFrame, metric: Metric) -> list[dict[str, Any]]:
+    """Return [{fy_quarter, value, n}] for this metric.
+
+    Required because medians/P90/unique-counts are not composable from monthly
+    aggregates — the frontend Q-level view needs these pre-computed on the
+    quarter slice directly.
+    """
+    if len(df) == 0:
+        return []
+    out: list[dict[str, Any]] = []
+    for (fy, q), sub in df.groupby(["fiscal_year", "fy_quarter"]):
+        out.append({
+            "fy_quarter": f"FY{int(fy) % 100:02d}-Q{int(q)}",
+            "value": metric.aggregator(sub),
+            "n": int(len(sub)),
+        })
+    out.sort(key=lambda r: r["fy_quarter"])
+    return out
+
+
 def _forecast_from_trailing(monthly: pd.DataFrame, window_months: int = 6) -> pd.DataFrame:
     """
     Walk-forward forecast: for month m, use trailing `window_months` months
@@ -619,6 +646,10 @@ def build_metric_payload(
 
     monthly_records = monthly.to_dict(orient="records")
 
+    # Quarterly series (FY-Q1..Q4). Pre-computed on quarter subsets so
+    # median/P90 metrics are correct — they are not composable from monthlies.
+    quarterly_records = _quarterly_aggregate(df_slice, metric)
+
     # Per-location breakdown (only meaningful when slice_kind != "location")
     by_location = []
     if slice_kind != "location":
@@ -674,6 +705,7 @@ def build_metric_payload(
         "overall": overall,
         "n_encounters": int(len(df_slice)),
         "monthly": monthly_records,
+        "quarterly": quarterly_records,
         "by_location": by_location,
         "by_condition": by_condition,
         "subcomponents": subcomponents,
@@ -1523,14 +1555,28 @@ def build_daily_report_payload(df: pd.DataFrame, location: str) -> dict[str, Any
 # Meta
 # ---------------------------------------------------------------------------
 
-def build_meta(df: pd.DataFrame, top_conditions: list[str]) -> dict[str, Any]:
+def build_meta(
+    df: pd.DataFrame,
+    top_conditions: list[str],
+    fiscal_year: int | None = None,
+) -> dict[str, Any]:
     arr = df["Arrival DateTime"].dropna()
+    data_through = arr.max() if not arr.empty else None
+    is_partial = False
+    if fiscal_year is not None and data_through is not None:
+        # Compare on date only — intra-day timing should not flag a complete FY
+        # as partial just because the last encounter arrived before 23:59.
+        fy_end_date = pd.Timestamp(year=fiscal_year, month=6, day=30).date()
+        is_partial = bool(data_through.date() < fy_end_date)
     return {
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "date_range": {
             "start": arr.min().strftime("%Y-%m-%d") if not arr.empty else None,
             "end": arr.max().strftime("%Y-%m-%d") if not arr.empty else None,
         },
+        "fiscal_year": fiscal_year,
+        "data_through": data_through.strftime("%Y-%m-%d") if data_through is not None else None,
+        "is_partial": is_partial,
         "locations": [{"name": l, "slug": slugify(l)} for l in ED_LOCATIONS],
         "acuity_levels": ACUITY_ORDER,
         "total_encounters": int(len(df)),
@@ -1605,74 +1651,132 @@ def write_json(obj: Any, path: Path) -> None:
 # Orchestrator
 # ---------------------------------------------------------------------------
 
+def emit_fy_payloads(
+    fy_df: pd.DataFrame,
+    df_all: pd.DataFrame,
+    top_conditions: list[str],
+    fy_out: Path,
+    fiscal_year: int,
+    include_daily: bool,
+) -> None:
+    """Write the full per-FY payload tree (meta, summary, metrics, conditions,
+    and optionally daily reports) to `fy_out`. `df_all` is the full multi-year
+    dataset, used by `build_metric_payload` for the `by_condition` breakdown
+    and the current-month flag (only the latest FY has a 'current month')."""
+    fy_out.mkdir(parents=True, exist_ok=True)
+    (fy_out / "metrics").mkdir(parents=True, exist_ok=True)
+    (fy_out / "conditions").mkdir(parents=True, exist_ok=True)
+
+    write_json(
+        build_meta(fy_df, top_conditions, fiscal_year=fiscal_year),
+        fy_out / "meta.json",
+    )
+    write_json(build_summary_payload(fy_df, top_conditions), fy_out / "summary.json")
+
+    for m in METRICS:
+        metric_dir = fy_out / "metrics" / m.slug
+        metric_dir.mkdir(parents=True, exist_ok=True)
+        write_json(
+            build_metric_payload(fy_df, df_all, m, "All Sites", "all"),
+            metric_dir / "all.json",
+        )
+        for loc in ED_LOCATIONS:
+            sub = fy_df[fy_df["ED Location"] == loc]
+            write_json(
+                build_metric_payload(sub, df_all, m, loc, "location"),
+                metric_dir / f"{slugify(loc)}.json",
+            )
+        for cat in top_conditions:
+            sub = fy_df[fy_df["ICD-10 Condition Category"] == cat]
+            write_json(
+                build_metric_payload(sub, df_all, m, cat, "condition"),
+                metric_dir / f"cond-{slugify(cat)}.json",
+            )
+
+    for cat in top_conditions:
+        payload = build_condition_payload(fy_df, cat)
+        write_json(payload, fy_out / "conditions" / f"{payload['slug']}.json")
+
+    if include_daily:
+        daily_dir = fy_out / "daily"
+        daily_dir.mkdir(parents=True, exist_ok=True)
+        write_json(build_daily_report_payload(fy_df, "ALL"), daily_dir / "all.json")
+        for loc in ED_LOCATIONS:
+            payload = build_daily_report_payload(fy_df, loc)
+            write_json(payload, daily_dir / f"{slugify(loc)}.json")
+
+
+def mirror_latest_to_top_level(src: Path, dst: Path) -> None:
+    """Copy src/* onto dst/ so the pre-multi-FY flat layout still works for
+    the unmodified frontend. Overwrites top-level files on every run."""
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(item, target)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--encounters", required=True, type=Path)
+    parser.add_argument("--data-dir", type=Path, default=Path("data_raw"),
+                        help="Directory containing BO_data_pull*.csv files.")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    df = load_encounters(args.encounters)
-    df = compute_return_visits(df)
-    top_conditions = _top_conditions(df)
+    csv_files = sorted(args.data_dir.glob("BO_data_pull*.csv"))
+    if not csv_files:
+        log.error("No BO_data_pull*.csv files found in %s", args.data_dir)
+        return 2
 
-    # --- meta + summary + metric index ------------------------------------
-    write_json(build_meta(df, top_conditions), out / "meta.json")
-    log.info("Wrote meta.json")
-    write_json(build_summary_payload(df, top_conditions), out / "summary.json")
-    log.info("Wrote summary.json")
+    log.info("Loading %d clinical CSV(s) from %s", len(csv_files), args.data_dir)
+    parts = []
+    for p in csv_files:
+        part = load_encounters(p)
+        log.info("  %s: %d encounters", p.name, len(part))
+        parts.append(part)
+    df_all = pd.concat(parts, ignore_index=True)
+    log.info("Concatenated: %d total encounters", len(df_all))
+
+    df_all = compute_return_visits(df_all)
+    top_conditions = _top_conditions(df_all)
+
+    available_fys = sorted(int(fy) for fy in df_all["fiscal_year"].dropna().unique())
+    latest_fy = max(available_fys)
+
+    # --- top-level stable files -------------------------------------------
+    write_json(
+        {
+            "available_fys": available_fys,
+            "current_fy": latest_fy,
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+        },
+        out / "index.json",
+    )
+    log.info("Wrote index.json (FYs: %s, current=FY%d)", available_fys, latest_fy)
     write_json(build_metric_index(), out / "metrics" / "_index.json")
     log.info("Wrote metrics/_index.json")
 
-    # --- per-metric payloads ----------------------------------------------
-    log.info("Building %d metric payloads × %d slices",
-             len(METRICS), 1 + len(ED_LOCATIONS) + len(top_conditions))
-    for m in METRICS:
-        metric_dir = out / "metrics" / m.slug
-        metric_dir.mkdir(parents=True, exist_ok=True)
-
-        # Enterprise slice (all conditions, all locations)
-        write_json(
-            build_metric_payload(df, df, m, "All Sites", "all"),
-            metric_dir / "all.json",
+    # --- per-FY emit ------------------------------------------------------
+    for fy in available_fys:
+        fy_df = df_all[df_all["fiscal_year"] == fy].copy()
+        fy_out = out / f"fy{fy % 100:02d}"
+        log.info("Emitting FY%d -> %s (%d encounters, %d conditions)",
+                 fy, fy_out.name, len(fy_df), len(top_conditions))
+        emit_fy_payloads(
+            fy_df, df_all, top_conditions, fy_out,
+            fiscal_year=fy,
+            include_daily=(fy == latest_fy),
         )
 
-        # Per-location slices
-        for loc in ED_LOCATIONS:
-            sub = df[df["ED Location"] == loc]
-            write_json(
-                build_metric_payload(sub, df, m, loc, "location"),
-                metric_dir / f"{slugify(loc)}.json",
-            )
+    # --- top-level backward-compat mirror of the latest FY ----------------
+    mirror_latest_to_top_level(out / f"fy{latest_fy % 100:02d}", out)
+    log.info("Mirrored fy%02d to top level for backward compat", latest_fy % 100)
 
-        # Per-condition slices (all locations, one condition)
-        for cat in top_conditions:
-            sub = df[df["ICD-10 Condition Category"] == cat]
-            write_json(
-                build_metric_payload(sub, df, m, cat, "condition"),
-                metric_dir / f"cond-{slugify(cat)}.json",
-            )
-        log.info("  %s: done", m.slug)
-
-    # --- condition drill-downs (kept for /conditions) ---------------------
-    for cat in top_conditions:
-        payload = build_condition_payload(df, cat)
-        write_json(payload, out / "conditions" / f"{payload['slug']}.json")
-    log.info("Wrote %d condition payloads", len(top_conditions))
-
-    # --- Daily Activity Reports (1 payload per location + 'all') ----------
-    daily_dir = out / "daily"
-    daily_dir.mkdir(parents=True, exist_ok=True)
-    write_json(build_daily_report_payload(df, "ALL"), daily_dir / "all.json")
-    log.info("Wrote daily/all.json")
-    for loc in ED_LOCATIONS:
-        payload = build_daily_report_payload(df, loc)
-        write_json(payload, daily_dir / f"{slugify(loc)}.json")
-        log.info("Wrote daily/%s.json", slugify(loc))
-
-    log.info("Pipeline complete.")
+    log.info("Pipeline complete. %d FYs emitted.", len(available_fys))
     return 0
 
 

@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
-    "aggregate": "python scripts/aggregate.py --encounters data_raw/BO_data_pull.csv --out public/data",
+    "aggregate": "python scripts/aggregate.py --data-dir data_raw --out public/data",
     "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
