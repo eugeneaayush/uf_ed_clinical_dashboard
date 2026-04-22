@@ -55,6 +55,25 @@ const SUB_TABS: Array<{ id: SubTab; label: string; description: string }> = [
   { id: "MD", label: "MD → Order", description: "MD Disposition → Admit Order Written by unit & service" },
 ];
 
+// Dark-mode chart tokens shared across every Recharts instance on this page.
+const GRID_STROKE = "#27272a"; // zinc-800
+const TICK_FILL = "#71717a"; // zinc-500
+const CURSOR_FILL = "rgba(63, 63, 70, 0.35)"; // zinc-700 @ 35%
+const TICK_STYLE = { fill: TICK_FILL, fontSize: 10 } as const;
+
+// Brand + accent palette for line/bar series on dark surfaces.
+const COLOR = {
+  ufBlue: "#0021A5",
+  ufOrange: "#FA4616",
+  cyan: "#67e8f9", // cyan-300
+  violet: "#a78bfa", // violet-400
+  emerald: "#34d399", // emerald-400
+  amber: "#f59e0b", // amber-500
+  pink: "#f472b6", // pink-400
+  rose: "#fb7185", // rose-400
+  zinc300: "#d4d4d8",
+} as const;
+
 export function DailyReport() {
   const { loc, setLoc } = useLocationFilter();
   const slug = loc; // uses "all" or a location slug
@@ -64,6 +83,11 @@ export function DailyReport() {
 
   if (loading || !data) return <LoadingDots />;
   if (error) return <ErrorState error={error} />;
+
+  const siteOptions: Array<{ slug: string; label: string }> = [
+    { slug: "all", label: "All Sites" },
+    ...(meta.data?.locations ?? []).map((l) => ({ slug: l.slug, label: l.name })),
+  ];
 
   return (
     <div>
@@ -75,16 +99,13 @@ export function DailyReport() {
       />
 
       {/* Location picker — reuses the global filter */}
-      <div className="sticky top-[56px] z-10 -mx-6 mb-6 px-6 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
+      <div className="sticky top-[56px] z-10 -mx-6 mb-6 px-6 py-3 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500 pr-2">
+          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-zinc-500 pr-2">
             ED Site
           </span>
-          <div className="inline-flex rounded-full ring-1 ring-slate-200 bg-slate-50 p-0.5">
-            {([
-              { slug: "all", label: "All Sites" },
-              ...(meta.data?.locations ?? []).map((l) => ({ slug: l.slug, label: l.name })),
-            ] as Array<{ slug: string; label: string }>).map((opt) => (
+          <div className="inline-flex rounded-full ring-1 ring-zinc-800 bg-zinc-900 p-0.5">
+            {siteOptions.map((opt) => (
               <button
                 key={opt.slug}
                 type="button"
@@ -92,9 +113,9 @@ export function DailyReport() {
                 data-active={loc === opt.slug ? "true" : undefined}
                 className={clsx(
                   "px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-colors",
-                  "text-slate-600 hover:text-slate-900",
-                  "data-[active=true]:bg-white data-[active=true]:text-uf-blue",
-                  "data-[active=true]:ring-1 data-[active=true]:ring-uf-blue/20 data-[active=true]:shadow-sm"
+                  "text-zinc-400 hover:text-zinc-200",
+                  "data-[active=true]:bg-uf-blue data-[active=true]:text-white",
+                  "data-[active=true]:ring-1 data-[active=true]:ring-uf-blue/40 data-[active=true]:shadow-sm"
                 )}
               >
                 {opt.label}
@@ -108,29 +129,29 @@ export function DailyReport() {
       <HeadlineKpis payload={data} />
 
       {/* Sub-tab nav for the PDF sections */}
-      <div className="mt-6 mb-4 border-b border-slate-200">
-        <nav className="flex gap-6 overflow-x-auto thin-scroll">
+      <div className="mt-6 mb-4">
+        <nav className="inline-flex flex-wrap gap-1 rounded-full bg-zinc-900 ring-1 ring-zinc-800 p-1">
           {SUB_TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
+              data-active={tab === t.id ? "true" : undefined}
               className={clsx(
-                "pb-2.5 pt-1 whitespace-nowrap transition-colors",
-                "text-[13px] font-medium",
-                tab === t.id
-                  ? "text-uf-blue border-b-2 border-uf-blue"
-                  : "text-slate-500 hover:text-slate-900 border-b-2 border-transparent"
+                "px-3.5 py-1.5 rounded-full whitespace-nowrap transition-colors",
+                "text-[13px] font-medium text-zinc-400 hover:text-zinc-200",
+                "data-[active=true]:bg-uf-blue/15 data-[active=true]:text-uf-blue",
+                "data-[active=true]:ring-1 data-[active=true]:ring-uf-blue/30"
               )}
             >
-              <span className="font-mono text-[10.5px] text-slate-400 mr-1.5">
+              <span className="font-mono text-[10.5px] text-zinc-500 mr-1.5 data-[active=true]:text-uf-blue/80">
                 {t.id}
               </span>
               {t.label}
             </button>
           ))}
         </nav>
-        <p className="mt-2 mb-3 text-[11.5px] text-slate-500">
+        <p className="mt-3 text-[11.5px] text-zinc-500">
           {SUB_TABS.find((t) => t.id === tab)?.description}
         </p>
       </div>
@@ -226,8 +247,13 @@ function HeadlineKpis({ payload }: { payload: DailyReportPayload }) {
    Section 1A — Daily Volumes
    =========================================================================== */
 
+const BUCKET_ORDER = ["ADMIT", "DISCHARGE", "LWBS", "ED TO ED TRANSFER", "OTHER"] as const;
+const BUCKET_ACCENT: Record<string, string> = {
+  ADMIT: "border-l-2 border-uf-blue",
+  DISCHARGE: "border-l-2 border-emerald-400",
+};
+
 function Section1A({ payload }: { payload: DailyReportPayload }) {
-  // Volume trend chart
   const volTrend = payload.rolling_dates.map((d, i) => ({
     date: d.slice(5), // "MM-DD"
     encounters: payload.rolling_volumes.registered_visits[i],
@@ -238,7 +264,6 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
   }));
 
   // Roll up every disposition row into its parent bucket for the breakdown table
-  const BUCKET_ORDER = ["ADMIT", "DISCHARGE", "LWBS", "ED TO ED TRANSFER", "OTHER"];
   const bucketTotals = useMemo(() => {
     const totals = new Map<string, number>(BUCKET_ORDER.map((b) => [b, 0]));
     for (const row of payload.disposition_breakdown) {
@@ -258,16 +283,16 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
         <div className="h-[380px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={volTrend} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={20} />
-              <YAxis tickLine={false} axisLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-              <Line isAnimationActive={false} type="monotone" dataKey="encounters" name="Encounters" stroke="#0021A5" strokeWidth={2.5} dot={{ r: 2 }} />
-              <Line isAnimationActive={false} type="monotone" dataKey="admits" name="Admits" stroke="#FA4616" strokeWidth={2} dot={{ r: 2 }} />
-              <Line isAnimationActive={false} type="monotone" dataKey="discharges" name="Discharges" stroke="#16a34a" strokeWidth={2} dot={{ r: 2 }} />
-              <Line isAnimationActive={false} type="monotone" dataKey="lwbs" name="LWBS" stroke="#dc2626" strokeWidth={1.5} dot={{ r: 2 }} />
-              <Line isAnimationActive={false} type="monotone" dataKey="transfers" name="Transfers" stroke="#7c3aed" strokeWidth={1.5} dot={{ r: 2 }} />
+              <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={TICK_STYLE} interval="preserveStartEnd" minTickGap={20} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
+              <Line isAnimationActive={false} type="monotone" dataKey="encounters" name="Encounters" stroke={COLOR.ufBlue} strokeWidth={2.5} dot={{ r: 2 }} />
+              <Line isAnimationActive={false} type="monotone" dataKey="admits" name="Admits" stroke={COLOR.ufOrange} strokeWidth={2} dot={{ r: 2 }} />
+              <Line isAnimationActive={false} type="monotone" dataKey="discharges" name="Discharges" stroke={COLOR.cyan} strokeWidth={2} dot={{ r: 2 }} />
+              <Line isAnimationActive={false} type="monotone" dataKey="lwbs" name="LWBS" stroke={COLOR.violet} strokeWidth={1.5} dot={{ r: 2 }} />
+              <Line isAnimationActive={false} type="monotone" dataKey="transfers" name="Transfers" stroke={COLOR.emerald} strokeWidth={1.5} dot={{ r: 2 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -279,14 +304,16 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
         sub="Most recent 4 days with every KPI from the daily summary"
       >
         <div className="overflow-x-auto thin-scroll">
-          <table className="data-table min-w-[640px]">
+          <table className="w-full min-w-[640px] text-[12.5px]">
             <thead>
-              <tr>
-                <th>Visit Type</th>
+              <tr className="border-b border-zinc-800">
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-left px-3 py-2.5">Visit Type</th>
                 {payload.four_day_dates.map((d) => (
-                  <th key={d} className="text-right">{d.slice(5)}</th>
+                  <th key={d} className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">
+                    {d.slice(5)}
+                  </th>
                 ))}
-                <th className="text-right">Avg</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Avg</th>
               </tr>
             </thead>
             <tbody>
@@ -318,14 +345,14 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
                 const isPct = (key as string).startsWith("pct_");
                 const fmt = (v: number) => (isPct ? `${fmtDec(v, 1)}%` : fmtInt(v));
                 return (
-                  <tr key={key}>
-                    <td className="font-medium text-slate-900">{label}</td>
+                  <tr key={key} className="border-b border-zinc-900 hover:bg-zinc-900/60">
+                    <td className="px-3 py-2.5 font-medium text-zinc-400">{label}</td>
                     {vals.map((v, i) => (
-                      <td key={i} className="text-right num">
+                      <td key={i} className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">
                         {fmt(v)}
                       </td>
                     ))}
-                    <td className="text-right num font-semibold">
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-100">
                       {avg != null ? fmt(avg) : "—"}
                     </td>
                   </tr>
@@ -341,35 +368,35 @@ function Section1A({ payload }: { payload: DailyReportPayload }) {
         title="Disposition Breakdown (Rolling Month)"
         sub="Rolling 31-day totals for each disposition bucket, as a share of all encounters."
       >
-        <table className="data-table">
+        <table className="w-full text-[12.5px]">
           <thead>
-            <tr>
-              <th>Disposition Bucket</th>
-              <th className="text-right">31-day Total</th>
-              <th className="text-right">Avg / Day</th>
-              <th className="text-right">% of Total</th>
+            <tr className="border-b border-zinc-800">
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-left px-3 py-2.5">Disposition Bucket</th>
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">31-day Total</th>
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Avg / Day</th>
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">% of Total</th>
             </tr>
           </thead>
           <tbody>
             {bucketTotals.map((r) => (
-              <tr key={r.bucket}>
-                <td className="font-medium text-slate-900">{r.bucket}</td>
-                <td className="text-right num">{fmtInt(r.total)}</td>
-                <td className="text-right num text-slate-500">
+              <tr key={r.bucket} className={clsx("border-b border-zinc-900 hover:bg-zinc-900/60", BUCKET_ACCENT[r.bucket])}>
+                <td className="px-3 py-2.5 font-medium text-zinc-100">{r.bucket}</td>
+                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{fmtInt(r.total)}</td>
+                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-400">
                   {fmtDec(r.total / 31, 1)}
                 </td>
-                <td className="text-right num text-slate-500">
+                <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-400">
                   {grandTotal > 0 ? ((100 * r.total) / grandTotal).toFixed(1) : "0.0"}%
                 </td>
               </tr>
             ))}
-            <tr className="border-t-2 border-slate-300">
-              <td className="font-semibold text-slate-900">TOTAL</td>
-              <td className="text-right num font-semibold">{fmtInt(grandTotal)}</td>
-              <td className="text-right num font-semibold text-slate-500">
+            <tr className="border-t-2 border-zinc-700">
+              <td className="px-3 py-2.5 font-semibold text-zinc-100">TOTAL</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-100">{fmtInt(grandTotal)}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-400">
                 {fmtDec(grandTotal / 31, 1)}
               </td>
-              <td className="text-right num font-semibold text-slate-500">100.0%</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-400">100.0%</td>
             </tr>
           </tbody>
         </table>
@@ -409,7 +436,7 @@ function Section1B({ payload }: { payload: DailyReportPayload }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl ring-1 ring-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl ring-1 ring-zinc-800 bg-zinc-900/60 p-3">
         <ToggleGroup
           label="Mode"
           options={[
@@ -449,14 +476,16 @@ function Section1B({ payload }: { payload: DailyReportPayload }) {
         <div className="h-[420px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={20} />
+              <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={TICK_STYLE} interval="preserveStartEnd" minTickGap={20} />
               <YAxis
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: TICK_FILL }}
                 tickFormatter={(v: number) => `${v}h`}
               />
               <Tooltip
+                cursor={{ fill: CURSOR_FILL }}
                 content={
                   <ChartTooltip
                     valueFormatter={(v) =>
@@ -465,33 +494,33 @@ function Section1B({ payload }: { payload: DailyReportPayload }) {
                   />
                 }
               />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
               {/* 3.5h discharge target when showing discharge subset */}
               {disp === "discharge" && (
                 <ReferenceLine
                   y={3.5}
-                  stroke="#dc2626"
+                  stroke={COLOR.ufOrange}
                   strokeDasharray="4 3"
                   label={{
                     value: "3.5h Discharge Target",
                     position: "insideTopRight",
-                    fill: "#dc2626",
+                    fill: COLOR.ufOrange,
                     fontSize: 10,
                     fontFamily: "IBM Plex Mono",
                   }}
                 />
               )}
-              <Line isAnimationActive={false} type="monotone" dataKey="to_triage" name="To Triage" stroke="#FA4616" strokeWidth={1.5} dot={{ r: 1.5 }} connectNulls />
-              <Line isAnimationActive={false} type="monotone" dataKey="to_room" name="To Room" stroke="#ec4899" strokeWidth={1.5} dot={{ r: 1.5 }} connectNulls />
-              <Line isAnimationActive={false} type="monotone" dataKey="to_md" name="To MD" stroke="#16a34a" strokeWidth={1.5} dot={{ r: 1.5 }} connectNulls />
-              <Line isAnimationActive={false} type="monotone" dataKey="to_disposition" name="To Disposition" stroke="#0021A5" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              <Line isAnimationActive={false} type="monotone" dataKey="to_triage" name="To Triage" stroke={COLOR.cyan} strokeWidth={1.5} dot={{ r: 1.5 }} connectNulls />
+              <Line isAnimationActive={false} type="monotone" dataKey="to_room" name="To Room" stroke={COLOR.violet} strokeWidth={1.5} dot={{ r: 1.5 }} connectNulls />
+              <Line isAnimationActive={false} type="monotone" dataKey="to_md" name="To MD" stroke={COLOR.emerald} strokeWidth={1.5} dot={{ r: 1.5 }} connectNulls />
+              <Line isAnimationActive={false} type="monotone" dataKey="to_disposition" name="To Disposition" stroke={COLOR.ufBlue} strokeWidth={2} dot={{ r: 2 }} connectNulls />
               {disp === "admit" && (
                 <>
-                  <Line isAnimationActive={false} type="monotone" dataKey="to_order_written" name="To Order Written" stroke="#7c3aed" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                  <Line isAnimationActive={false} type="monotone" dataKey="to_bed_ready" name="To Bed Ready" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line isAnimationActive={false} type="monotone" dataKey="to_order_written" name="To Order Written" stroke={COLOR.amber} strokeWidth={2} dot={{ r: 2 }} connectNulls />
+                  <Line isAnimationActive={false} type="monotone" dataKey="to_bed_ready" name="To Bed Ready" stroke={COLOR.pink} strokeWidth={2} dot={{ r: 2 }} connectNulls />
                 </>
               )}
-              <Line isAnimationActive={false} type="monotone" dataKey="to_exit" name="To Exit" stroke="#1d293d" strokeWidth={2.5} dot={{ r: 2 }} connectNulls />
+              <Line isAnimationActive={false} type="monotone" dataKey="to_exit" name="To Exit" stroke={COLOR.ufOrange} strokeWidth={2.5} dot={{ r: 2 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -502,13 +531,15 @@ function Section1B({ payload }: { payload: DailyReportPayload }) {
         title="Summary Table"
         sub="Median per column across the 31-day window"
       >
-        <table className="data-table">
+        <table className="w-full text-[12.5px]">
           <thead>
-            <tr>
-              <th>Series</th>
-              <th className="text-right">31-Day {effectiveStat === "median" ? "Median" : "P90"} (hrs)</th>
-              <th className="text-right">Min</th>
-              <th className="text-right">Max</th>
+            <tr className="border-b border-zinc-800">
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-left px-3 py-2.5">Series</th>
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">
+                31-Day {effectiveStat === "median" ? "Median" : "P90"} (hrs)
+              </th>
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Min</th>
+              <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Max</th>
             </tr>
           </thead>
           <tbody>
@@ -533,11 +564,11 @@ function Section1B({ payload }: { payload: DailyReportPayload }) {
               if (!vals.length) return null;
               const median = [...vals].sort((a, b) => a - b)[Math.floor(vals.length / 2)];
               return (
-                <tr key={field}>
-                  <td className="font-medium text-slate-900">{label}</td>
-                  <td className="text-right num font-semibold">{fmtDec(median, 2)}h</td>
-                  <td className="text-right num text-slate-500">{fmtDec(Math.min(...vals), 2)}h</td>
-                  <td className="text-right num text-slate-500">{fmtDec(Math.max(...vals), 2)}h</td>
+                <tr key={field} className="border-b border-zinc-900 hover:bg-zinc-900/60">
+                  <td className="px-3 py-2.5 font-medium text-zinc-400">{label}</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-100">{fmtDec(median, 2)}h</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-500">{fmtDec(Math.min(...vals), 2)}h</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-500">{fmtDec(Math.max(...vals), 2)}h</td>
                 </tr>
               );
             })}
@@ -600,18 +631,18 @@ function Section1C({ payload }: { payload: DailyReportPayload }) {
         <div className="h-[380px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={20} />
-              <YAxis yAxisId="left" tickLine={false} axisLine={false} />
-              <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={TICK_STYLE} interval="preserveStartEnd" minTickGap={20} />
+              <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+              <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
               <Bar
                 isAnimationActive={false}
                 yAxisId="left"
                 dataKey="hold_hours"
                 name="Hold Hours"
-                fill="#16a34a"
+                fill={COLOR.ufOrange}
                 radius={[4, 4, 0, 0]}
               />
               <Line
@@ -620,7 +651,7 @@ function Section1C({ payload }: { payload: DailyReportPayload }) {
                 type="monotone"
                 dataKey="encounters"
                 name="Encounters"
-                stroke="#0021A5"
+                stroke={COLOR.ufBlue}
                 strokeWidth={2}
                 dot={{ r: 1.5 }}
               />
@@ -630,7 +661,7 @@ function Section1C({ payload }: { payload: DailyReportPayload }) {
                 type="monotone"
                 dataKey="lwbs"
                 name="LWBS"
-                stroke="#dc2626"
+                stroke={COLOR.violet}
                 strokeWidth={1.5}
                 dot={{ r: 1.5 }}
               />
@@ -660,7 +691,7 @@ function Section1D({ payload }: { payload: DailyReportPayload }) {
   }));
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 rounded-xl ring-1 ring-slate-200 bg-slate-50 p-3">
+      <div className="flex items-center gap-3 rounded-xl ring-1 ring-zinc-800 bg-zinc-900/60 p-3">
         <ToggleGroup
           label="Include"
           options={[
@@ -679,13 +710,13 @@ function Section1D({ payload }: { payload: DailyReportPayload }) {
         <div className="h-[380px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={20} />
-              <YAxis tickLine={false} axisLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={TICK_STYLE} interval="preserveStartEnd" minTickGap={20} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
               {(["ESI-1", "ESI-2", "ESI-3", "ESI-4", "ESI-5", "Unknown"] as const).map((a) => (
-                <Bar isAnimationActive={false} key={a} dataKey={a} stackId="a" fill={ACUITY_COLOR[a] ?? "#cad5e2"} />
+                <Bar isAnimationActive={false} key={a} dataKey={a} stackId="a" fill={ACUITY_COLOR[a] ?? "#3f3f46"} />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -710,39 +741,39 @@ function Section1E({ payload }: { payload: DailyReportPayload }) {
       <div className="h-[340px] mb-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="interval" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-            <YAxis tickLine={false} axisLine={false} />
-            <Tooltip content={<ChartTooltip />} />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+            <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+            <XAxis dataKey="interval" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL, fontSize: 11 }} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
             {(["ESI-1", "ESI-2", "ESI-3", "ESI-4", "ESI-5"] as const).map((a) => (
               <Bar isAnimationActive={false} key={a} dataKey={a} stackId="a" fill={ACUITY_COLOR[a]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <table className="data-table">
+      <table className="w-full text-[12.5px]">
         <thead>
-          <tr>
-            <th>Interval</th>
-            <th className="text-right">ESI-1</th>
-            <th className="text-right">ESI-2</th>
-            <th className="text-right">ESI-3</th>
-            <th className="text-right">ESI-4</th>
-            <th className="text-right">ESI-5</th>
-            <th className="text-right">Total</th>
+          <tr className="border-b border-zinc-800">
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-left px-3 py-2.5">Interval</th>
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">ESI-1</th>
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">ESI-2</th>
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">ESI-3</th>
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">ESI-4</th>
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">ESI-5</th>
+            <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Total</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.interval}>
-              <td className="font-medium text-slate-900">{r.interval}</td>
-              <td className="text-right num">{r["ESI-1"]}</td>
-              <td className="text-right num">{r["ESI-2"]}</td>
-              <td className="text-right num">{r["ESI-3"]}</td>
-              <td className="text-right num">{r["ESI-4"]}</td>
-              <td className="text-right num">{r["ESI-5"]}</td>
-              <td className="text-right num font-semibold">{r.total}</td>
+            <tr key={r.interval} className="border-b border-zinc-900 hover:bg-zinc-900/60">
+              <td className="px-3 py-2.5 font-medium text-zinc-200">{r.interval}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{r["ESI-1"]}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{r["ESI-2"]}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{r["ESI-3"]}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{r["ESI-4"]}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{r["ESI-5"]}</td>
+              <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-100">{r.total}</td>
             </tr>
           ))}
         </tbody>
@@ -759,7 +790,7 @@ function Section1F({ payload }: { payload: DailyReportPayload }) {
   const [view, setView] = useState<"today" | "cumulative" | "rolling">("today");
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 rounded-xl ring-1 ring-slate-200 bg-slate-50 p-3">
+      <div className="flex items-center gap-3 rounded-xl ring-1 ring-zinc-800 bg-zinc-900/60 p-3">
         <ToggleGroup
           label="View"
           options={[
@@ -783,22 +814,32 @@ function HourlyToday({ rows }: { rows: HourlyActivityRow[] }) {
     <Card
       num="01"
       title="Hourly Activity — Arrivals vs Census vs Wait"
-      sub="Arrivals bars plus total-in-ED, total-in-waiting, and max-wait-hours line overlays"
+      sub="Arrivals bars plus total-in-ED, total-in-waiting, and max-wait-hours line overlays. The orange max-wait line is the boarding-crisis signal."
     >
       <div className="h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="left" tickLine={false} axisLine={false} />
-            <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
-            <Tooltip content={<ChartTooltip />} />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-            <Bar isAnimationActive={false} yAxisId="left" dataKey="arrivals" name="Arrivals" fill="#1d293d" radius={[3, 3, 0, 0]} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_ed" name="Total in ED" stroke="#0021A5" strokeWidth={2} dot={{ r: 1.5 }} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_waiting" name="Total in Waiting" stroke="#FA4616" strokeWidth={2} dot={{ r: 1.5 }} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="max_hrs_waiting_rm" name="Max Wait (hrs)" stroke="#16a34a" strokeWidth={1.5} strokeDasharray="4 3" dot={{ r: 1.5 }} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="lwbs" name="LWBS" stroke="#dc2626" strokeWidth={1.5} dot={{ r: 1.5 }} />
+            <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" tick={{ fill: TICK_FILL, fontSize: 10 }} />
+            <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
+            <Bar isAnimationActive={false} yAxisId="left" dataKey="arrivals" name="Arrivals" fill={COLOR.ufBlue} radius={[3, 3, 0, 0]} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_ed" name="Total in ED" stroke={COLOR.cyan} strokeWidth={2} dot={{ r: 1.5 }} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_waiting" name="Total in Waiting" stroke={COLOR.ufOrange} strokeWidth={2} dot={{ r: 1.5 }} />
+            <Line
+              isAnimationActive={false}
+              yAxisId="right"
+              type="monotone"
+              dataKey="max_hrs_waiting_rm"
+              name="Max Wait (hrs)"
+              stroke={COLOR.ufOrange}
+              strokeWidth={3}
+              dot={{ r: 2, fill: COLOR.ufOrange }}
+              style={{ filter: "drop-shadow(0 0 6px rgba(250,70,22,0.6))" }}
+            />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="lwbs" name="LWBS" stroke={COLOR.violet} strokeWidth={1.5} dot={{ r: 1.5 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -816,15 +857,15 @@ function HourlyCumulative({ rows }: { rows: CumulativeHourRow[] }) {
       <div className="h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="left" tickLine={false} axisLine={false} />
-            <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
-            <Tooltip content={<ChartTooltip />} />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-            <Bar isAnimationActive={false} yAxisId="left" dataKey="cumulative_arrivals" name="Cum Arrivals" fill="#1d293d" radius={[3, 3, 0, 0]} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="cumulative_admit_dispo" name="Cum Admit Dispo" stroke="#0021A5" strokeWidth={2.5} dot={{ r: 2 }} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="cumulative_bed_ready" name="Cum Bed Ready" stroke="#FA4616" strokeWidth={2.5} dot={{ r: 2 }} />
+            <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" tick={{ fill: TICK_FILL, fontSize: 10 }} />
+            <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
+            <Bar isAnimationActive={false} yAxisId="left" dataKey="cumulative_arrivals" name="Cum Arrivals" fill={COLOR.ufBlue} radius={[3, 3, 0, 0]} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="cumulative_admit_dispo" name="Cum Admit Dispo" stroke={COLOR.cyan} strokeWidth={2.5} dot={{ r: 2 }} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="cumulative_bed_ready" name="Cum Bed Ready" stroke={COLOR.ufOrange} strokeWidth={2.5} dot={{ r: 2 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -842,16 +883,16 @@ function HourlyRolling({ rows }: { rows: HourlyRollingRow[] }) {
       <div className="h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" tick={{ fontSize: 10 }} />
-            <YAxis yAxisId="left" tickLine={false} axisLine={false} />
-            <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
-            <Tooltip content={<ChartTooltip />} />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-            <Bar isAnimationActive={false} yAxisId="left" dataKey="arrivals" name="Avg Arrivals" fill="#1d293d" radius={[3, 3, 0, 0]} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_ed" name="Avg in ED" stroke="#0021A5" strokeWidth={2} dot={{ r: 1.5 }} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_waiting" name="Avg in Waiting" stroke="#FA4616" strokeWidth={2} dot={{ r: 1.5 }} />
-            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="lwbs" name="Avg LWBS" stroke="#dc2626" strokeWidth={1.5} dot={{ r: 1.5 }} />
+            <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" tick={{ fill: TICK_FILL, fontSize: 10 }} />
+            <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fill: TICK_FILL }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: CURSOR_FILL }} />
+            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: TICK_FILL }} />
+            <Bar isAnimationActive={false} yAxisId="left" dataKey="arrivals" name="Avg Arrivals" fill={COLOR.ufBlue} radius={[3, 3, 0, 0]} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_ed" name="Avg in ED" stroke={COLOR.cyan} strokeWidth={2} dot={{ r: 1.5 }} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="total_in_waiting" name="Avg in Waiting" stroke={COLOR.ufOrange} strokeWidth={2} dot={{ r: 1.5 }} />
+            <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="lwbs" name="Avg LWBS" stroke={COLOR.violet} strokeWidth={1.5} dot={{ r: 1.5 }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -880,14 +921,16 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
     return (
       <Card num="01" title="MD Disposition → Admit Order Written" sub="Admit unit and admit service analysis">
         <div className="p-8 text-center">
-          <p className="text-[14px] text-slate-600 mb-2">
+          <p className="text-[14px] text-zinc-300 mb-2">
             Admit Unit and Admit Service data not available in the current BO pull.
           </p>
-          <p className="text-[12px] text-slate-500">
-            To enable this section, include <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">Admit Unit</code>{" "}
-            and <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">Admit Service</code> columns in the BO data export.
-            Once present, re-run the aggregator (<code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">npm run aggregate</code>)
-            and this section will populate automatically.
+          <p className="text-[12px] text-zinc-500">
+            To enable this section, include{" "}
+            <code className="font-mono bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded">Admit Unit</code>{" "}
+            and <code className="font-mono bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded">Admit Service</code>{" "}
+            columns in the BO data export. Once present, re-run the aggregator (
+            <code className="font-mono bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded">npm run aggregate</code>
+            ) and this section will populate automatically.
           </p>
         </div>
       </Card>
@@ -899,7 +942,7 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl ring-1 ring-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl ring-1 ring-zinc-800 bg-zinc-900/60 p-3">
         <ToggleGroup
           label="Group By"
           options={[
@@ -923,7 +966,7 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
       <Card
         num="01"
         title={`MD Dispo → Order Written by Admit ${grouping === "unit" ? "Unit" : "Service"}`}
-        sub={`${window === "rolling" ? "Rolling-month" : "Single-day"} average hours from Disposition to Admit Order Written. Red line = 1-hour goal. Admits count (black) overlaid.`}
+        sub={`${window === "rolling" ? "Rolling-month" : "Single-day"} average hours from Disposition to Admit Order Written. Orange line = 1-hour goal. Admits count (blue) overlaid.`}
       >
         <div className="h-[480px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -932,11 +975,12 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
               layout="vertical"
               margin={{ top: 4, right: 24, bottom: 4, left: 4 }}
             >
-              <CartesianGrid horizontal={false} />
+              <CartesianGrid horizontal={false} stroke={GRID_STROKE} />
               <XAxis
                 type="number"
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: TICK_FILL }}
                 tickFormatter={(v: number) => `${v}h`}
                 domain={[0, "auto"]}
               />
@@ -946,6 +990,7 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
                 tickLine={false}
                 axisLine={false}
                 width={200}
+                tick={{ fill: TICK_FILL, fontSize: 11 }}
                 tickFormatter={(v) => truncate(v, 28)}
               />
               <Tooltip
@@ -956,14 +1001,14 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
                     }
                   />
                 }
-                cursor={{ fill: "#f1f5f9" }}
+                cursor={{ fill: CURSOR_FILL }}
               />
-              <ReferenceLine x={1} stroke="#dc2626" strokeDasharray="3 3" />
-              <Bar isAnimationActive={false} dataKey="avg_hours" name="Avg Hours" fill="#0021A5" radius={[0, 4, 4, 0]}>
+              <ReferenceLine x={1} stroke={COLOR.ufOrange} strokeDasharray="3 3" />
+              <Bar isAnimationActive={false} dataKey="avg_hours" name="Avg Hours" fill={COLOR.ufBlue} radius={[0, 4, 4, 0]}>
                 {capped.map((_, i) => (
                   <Cell
                     key={i}
-                    fill={(capped[i].avg_hours ?? 0) > 1 ? "#FA4616" : "#0021A5"}
+                    fill={(capped[i].avg_hours ?? 0) > 1 ? COLOR.ufOrange : COLOR.ufBlue}
                   />
                 ))}
               </Bar>
@@ -974,13 +1019,15 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
 
       <Card num="02" title="Full Table" sub="Every group with non-zero admits, sorted by longest delay first">
         <div className="overflow-x-auto thin-scroll">
-          <table className="data-table">
+          <table className="w-full text-[12.5px]">
             <thead>
-              <tr>
-                <th>{grouping === "unit" ? "Admit Unit" : "Admit Service"}</th>
-                <th className="text-right">Avg Hrs Dispo → Order</th>
-                <th className="text-right"># Admits</th>
-                <th className="text-right">% of Total Admits</th>
+              <tr className="border-b border-zinc-800">
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-left px-3 py-2.5">
+                  {grouping === "unit" ? "Admit Unit" : "Admit Service"}
+                </th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Avg Hrs Dispo → Order</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5"># Admits</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">% of Total Admits</th>
               </tr>
             </thead>
             <tbody>
@@ -988,18 +1035,18 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
                 const pct = maxAdmits > 0 ? (100 * r.admits) / maxAdmits : 0;
                 const overGoal = (r.avg_hours ?? 0) > 1;
                 return (
-                  <tr key={r.group}>
-                    <td className="font-medium text-slate-900">{r.group}</td>
-                    <td className={clsx("text-right num", overGoal ? "text-uf-orange font-semibold" : "text-slate-900")}>
+                  <tr key={r.group} className="border-b border-zinc-900 hover:bg-zinc-900/60">
+                    <td className="px-3 py-2.5 font-medium text-zinc-100">{r.group}</td>
+                    <td className={clsx("px-3 py-2.5 text-right font-mono tabular-nums", overGoal ? "text-uf-orange font-semibold" : "text-zinc-200")}>
                       {r.avg_hours != null ? `${fmtDec(r.avg_hours, 2)}h` : "—"}
                       {overGoal && (
-                        <span className="ml-1.5 inline-flex items-center rounded-md bg-uf-orange/10 px-1 py-0.5 font-mono text-[9.5px] font-semibold text-uf-orange">
+                        <span className="ml-1.5 inline-flex items-center rounded-md bg-uf-orange/10 px-1 py-0.5 font-mono text-[9.5px] font-semibold text-uf-orange ring-1 ring-uf-orange/30">
                           &gt; 1h
                         </span>
                       )}
                     </td>
-                    <td className="text-right num">{fmtInt(r.admits)}</td>
-                    <td className="text-right num text-slate-500">{pct.toFixed(1)}%</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{fmtInt(r.admits)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-500">{pct.toFixed(1)}%</td>
                   </tr>
                 );
               })}
@@ -1014,24 +1061,24 @@ function SectionMD({ payload }: { payload: DailyReportPayload }) {
           title={`Top 2 Admit Services — Last 24 Hours (by ED Exit Date = ${payload.report_date})`}
           sub="Replicates the PDF's top-2 admit service panel"
         >
-          <table className="data-table">
+          <table className="w-full text-[12.5px]">
             <thead>
-              <tr>
-                <th className="text-right">Rank</th>
-                <th>Admit Service</th>
-                <th className="text-right"># Admits</th>
-                <th className="text-right">% Admits</th>
-                <th className="text-right">Avg ED LOS</th>
+              <tr className="border-b border-zinc-800">
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Rank</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-left px-3 py-2.5">Admit Service</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5"># Admits</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">% Admits</th>
+                <th className="font-mono text-[11px] uppercase tracking-[0.08em] text-zinc-500 font-medium text-right px-3 py-2.5">Avg ED LOS</th>
               </tr>
             </thead>
             <tbody>
               {payload.top_admit_services_24h.map((r) => (
-                <tr key={r.rank + r.service}>
-                  <td className="text-right num font-semibold">{r.rank}</td>
-                  <td className="font-medium text-slate-900">{r.service}</td>
-                  <td className="text-right num">{fmtInt(r.admits)}</td>
-                  <td className="text-right num">{fmtDec(r.pct_admits, 2)}%</td>
-                  <td className="text-right num">{r.avg_ed_los_hrs != null ? `${fmtDec(r.avg_ed_los_hrs, 2)}h` : "—"}</td>
+                <tr key={r.rank + r.service} className="border-b border-zinc-900 hover:bg-zinc-900/60">
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums font-semibold text-zinc-100">{r.rank}</td>
+                  <td className="px-3 py-2.5 font-medium text-zinc-100">{r.service}</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{fmtInt(r.admits)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{fmtDec(r.pct_admits, 2)}%</td>
+                  <td className="px-3 py-2.5 text-right font-mono tabular-nums text-zinc-200">{r.avg_ed_los_hrs != null ? `${fmtDec(r.avg_ed_los_hrs, 2)}h` : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1059,8 +1106,8 @@ function ToggleGroup<T extends string>({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <div className="inline-flex rounded-full ring-1 ring-slate-200 bg-white p-0.5">
+      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-zinc-500">{label}</span>
+      <div className="inline-flex rounded-full ring-1 ring-zinc-800 bg-zinc-950 p-0.5">
         {options.map((o) => (
           <button
             key={o.id}
@@ -1071,8 +1118,8 @@ function ToggleGroup<T extends string>({
             className={clsx(
               "px-3 py-1 rounded-full text-[11.5px] font-medium transition-colors",
               o.disabled
-                ? "text-slate-300 cursor-not-allowed"
-                : "text-slate-600 hover:text-slate-900",
+                ? "text-zinc-600 cursor-not-allowed"
+                : "text-zinc-400 hover:text-zinc-200",
               "data-[active=true]:bg-uf-blue data-[active=true]:text-white"
             )}
           >
