@@ -40,14 +40,14 @@ export function FilterBar({
   const locDisabled = lockLocation || compare;
 
   return (
-    <div className="sticky top-[56px] z-10 -mx-6 mb-6 px-6 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <div className="sticky top-0 z-10 -mx-4 md:-mx-8 mb-6 px-4 md:px-8 py-3 bg-zinc-950/90 backdrop-blur-md border-b border-white/5">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500 pr-2">
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-zinc-500 pr-2">
           ED Site
         </span>
         <div
           className={clsx(
-            "inline-flex rounded-full ring-1 ring-slate-200 bg-slate-50 p-0.5",
+            "inline-flex rounded-full ring-1 ring-white/10 bg-zinc-900 p-0.5",
             locDisabled && "opacity-50 pointer-events-none"
           )}
         >
@@ -59,9 +59,9 @@ export function FilterBar({
               data-active={loc === s ? "true" : undefined}
               className={clsx(
                 "px-3.5 py-1.5 rounded-full text-[12.5px] font-medium transition-colors",
-                "text-slate-600 hover:text-slate-900",
-                "data-[active=true]:bg-white data-[active=true]:text-uf-blue",
-                "data-[active=true]:ring-1 data-[active=true]:ring-uf-blue/20",
+                "text-zinc-400 hover:text-zinc-100",
+                "data-[active=true]:bg-zinc-800 data-[active=true]:text-zinc-100",
+                "data-[active=true]:ring-1 data-[active=true]:ring-uf-blue/40",
                 "data-[active=true]:shadow-sm"
               )}
             >
@@ -72,14 +72,14 @@ export function FilterBar({
 
         {showCondition && (
           <>
-            <span aria-hidden className="h-5 w-px bg-slate-200 mx-1" />
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500">
+            <span aria-hidden className="h-5 w-px bg-white/10 mx-1" />
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-zinc-500">
               Condition
             </span>
             <select
               value={condition ?? ""}
               onChange={(e) => setCondition(e.target.value || null)}
-              className="rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-uf-blue min-w-[180px]"
+              className="rounded-full bg-zinc-900 ring-1 ring-white/10 px-3 py-1.5 text-[12.5px] font-medium text-zinc-100 focus:outline-none focus:ring-2 focus:ring-uf-blue min-w-[180px]"
             >
               <option value="">All Conditions</option>
               {meta.data?.conditions.map((c) => (
@@ -93,14 +93,14 @@ export function FilterBar({
 
         {showCompare && (
           <>
-            <span aria-hidden className="h-5 w-px bg-slate-200 mx-1" />
+            <span aria-hidden className="h-5 w-px bg-white/10 mx-1" />
             <button
               type="button"
               onClick={() => setCompare(!compare)}
               data-active={compare ? "true" : undefined}
               className={clsx(
                 "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium transition-colors",
-                "ring-1 ring-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900",
+                "ring-1 ring-white/10 bg-zinc-900 text-zinc-400 hover:text-zinc-100",
                 "data-[active=true]:bg-uf-blue data-[active=true]:text-white data-[active=true]:ring-uf-blue"
               )}
             >
@@ -119,7 +119,7 @@ export function FilterBar({
 
             {compare && (
               <>
-                <div className="inline-flex rounded-full ring-1 ring-slate-200 bg-slate-50 p-0.5">
+                <div className="inline-flex rounded-full ring-1 ring-white/10 bg-zinc-900 p-0.5">
                   {(["location", "condition"] as CompareDimension[]).map((d) => (
                     <button
                       key={d}
@@ -128,9 +128,9 @@ export function FilterBar({
                       data-active={dim === d ? "true" : undefined}
                       className={clsx(
                         "px-3 py-1 rounded-full text-[11.5px] font-medium transition-colors",
-                        "text-slate-600 hover:text-slate-900",
-                        "data-[active=true]:bg-white data-[active=true]:text-slate-900",
-                        "data-[active=true]:ring-1 data-[active=true]:ring-slate-300"
+                        "text-zinc-400 hover:text-zinc-100",
+                        "data-[active=true]:bg-zinc-800 data-[active=true]:text-zinc-100",
+                        "data-[active=true]:ring-1 data-[active=true]:ring-white/20"
                       )}
                     >
                       by {d === "location" ? "Site" : "Condition"}
@@ -138,7 +138,7 @@ export function FilterBar({
                   ))}
                 </div>
 
-                <div className="inline-flex rounded-full ring-1 ring-slate-200 bg-slate-50 p-0.5">
+                <div className="inline-flex rounded-full ring-1 ring-white/10 bg-zinc-900 p-0.5">
                   {(["small", "overlay"] as CompareView[]).map((v) => (
                     <button
                       key={v}
@@ -147,9 +147,9 @@ export function FilterBar({
                       data-active={view === v ? "true" : undefined}
                       className={clsx(
                         "px-3 py-1 rounded-full text-[11.5px] font-medium transition-colors",
-                        "text-slate-600 hover:text-slate-900",
-                        "data-[active=true]:bg-white data-[active=true]:text-slate-900",
-                        "data-[active=true]:ring-1 data-[active=true]:ring-slate-300"
+                        "text-zinc-400 hover:text-zinc-100",
+                        "data-[active=true]:bg-zinc-800 data-[active=true]:text-zinc-100",
+                        "data-[active=true]:ring-1 data-[active=true]:ring-white/20"
                       )}
                     >
                       {v === "small" ? "Small Multiples" : "Overlay"}
@@ -161,7 +161,7 @@ export function FilterBar({
           </>
         )}
       </div>
-      {hint && <p className="mt-2 text-[11.5px] text-slate-500">{hint}</p>}
+      {hint && <p className="mt-2 text-[11.5px] text-zinc-500">{hint}</p>}
     </div>
   );
 }

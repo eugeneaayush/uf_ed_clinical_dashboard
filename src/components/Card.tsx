@@ -14,11 +14,9 @@ interface CardProps {
 }
 
 /**
- * Template card primitive.
- *
- * Visually mirrors the "numbered row + slash + label" treatment used on
- * the template site's Programs / Fellowships listings, transposed into a
- * data-tile header for the dashboard.
+ * Card primitive for the dashboard — a zinc-900 surface with a hairline ring
+ * and the mono-numbered "01 / Title" header treatment carried over from the
+ * original template, now tuned for dark canvas.
  */
 export function Card({
   num,
@@ -30,26 +28,31 @@ export function Card({
   flush = false,
 }: CardProps) {
   return (
-    <section className={clsx("tile animate-fade-up", className)}>
+    <section
+      className={clsx(
+        "tile animate-fade-up transition-colors hover:ring-zinc-700 hover:bg-zinc-900/80",
+        className
+      )}
+    >
       {(title || num || right) && (
         <header className="tile-header">
           <div className="flex items-start gap-4 min-w-0">
             {num && (
               <span
                 aria-hidden
-                className="font-mono text-[12px] text-uf-blue/80 pt-0.5 shrink-0"
+                className="font-mono text-[12px] text-blue-400 pt-0.5 shrink-0"
               >
                 {num}
               </span>
             )}
             <div className="min-w-0">
               {title && (
-                <h3 className="font-display font-bold text-[14px] text-slate-900 tracking-tight leading-tight">
+                <h3 className="font-display font-bold text-[14px] text-zinc-100 tracking-tight leading-tight">
                   {title}
                 </h3>
               )}
               {sub && (
-                <p className="mt-0.5 text-[12px] text-slate-500 leading-snug">
+                <p className="mt-0.5 text-[12px] text-zinc-400 leading-snug">
                   {sub}
                 </p>
               )}

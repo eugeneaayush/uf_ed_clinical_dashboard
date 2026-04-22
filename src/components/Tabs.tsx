@@ -15,6 +15,11 @@ interface TabsProps {
   defaultId?: string;
 }
 
+/**
+ * Sub-tab navigation. Each page (MetricDetail, DailyReport, etc.) renders
+ * its own `<Tabs>` below the shared `PageHeader`. Styled for the zinc canvas:
+ * active tab gets a UF-blue underline + mono number accent.
+ */
 export function Tabs({ tabs, paramName = "tab", defaultId }: TabsProps) {
   const [sp, setSp] = useSearchParams();
   const active = sp.get(paramName) ?? defaultId ?? tabs[0]?.id;
@@ -33,7 +38,7 @@ export function Tabs({ tabs, paramName = "tab", defaultId }: TabsProps) {
 
   return (
     <div className="mb-6">
-      <div className="flex flex-wrap items-center gap-0 border-b border-slate-200">
+      <div className="flex flex-wrap items-center gap-0 border-b border-white/10">
         {tabs.map((t) => {
           const isActive = t.id === current?.id;
           return (
@@ -42,16 +47,16 @@ export function Tabs({ tabs, paramName = "tab", defaultId }: TabsProps) {
               type="button"
               onClick={() => setActive(t.id)}
               className={clsx(
-                "flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-colors border-b-2",
+                "flex items-center gap-3 px-4 py-3 text-[13px] font-medium transition-colors border-b-2 -mb-px",
                 isActive
-                  ? "text-slate-900 border-uf-blue"
-                  : "text-slate-500 border-transparent hover:text-slate-900"
+                  ? "text-zinc-100 border-uf-blue"
+                  : "text-zinc-400 border-transparent hover:text-zinc-100"
               )}
             >
               <span
                 className={clsx(
                   "font-mono text-[11px]",
-                  isActive ? "text-uf-blue" : "text-slate-400"
+                  isActive ? "text-blue-400" : "text-zinc-500"
                 )}
               >
                 {t.num}
@@ -62,7 +67,7 @@ export function Tabs({ tabs, paramName = "tab", defaultId }: TabsProps) {
         })}
       </div>
       {current?.hint && (
-        <p className="mt-3 text-[12px] text-slate-500">{current.hint}</p>
+        <p className="mt-3 text-[12px] text-zinc-400">{current.hint}</p>
       )}
     </div>
   );
