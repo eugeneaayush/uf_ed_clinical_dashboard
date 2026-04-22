@@ -502,7 +502,14 @@ def load_encounters(path: Path) -> pd.DataFrame:
 
     df["reached_provider"] = df["MD Datetime"].notna() & ~df["is_lwbs"]
 
-    log.info("Loaded %d encounters", len(df))
+    # Collapse multi-row encounters to one row per CSN. The master clinical_data
+    # export replicates identical rows for a subset of encounters, so `keep=first`
+    # is lossless. Doing this at the end of load means every downstream .sum(),
+    # .mean(), .median(), value_counts(), and len(df) operates on
+    # one-row-per-encounter data with no further changes throughout the pipeline.
+    rows_before = len(df)
+    df = df.drop_duplicates(subset=["Encounter # (CSN)"], keep="first").reset_index(drop=True)
+    log.info("Loaded %d rows; %d distinct encounters after CSN dedup", rows_before, len(df))
     return df
 
 
@@ -901,7 +908,7 @@ def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
     monthly = (
         sub.groupby("year_month")
         .agg(
-            encounters=("Encounter #", "count"),
+            encounters=("Encounter # (CSN)", "count"),
             admits=("is_admit", "sum"),
             lwbs=("is_lwbs", "sum"),
         )
@@ -921,7 +928,7 @@ def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
     recent = sub.sort_values("Arrival DateTime", ascending=False).head(50)
     patient_list = [
         {
-            "encounter": r["Encounter #"],
+            "encounter": r["Encounter # (CSN)"],
             "mrn": r["MRN (UF)"],
             "location": r["ED Location"],
             "acuity": r["Acuity"],
@@ -1720,26 +1727,20 @@ def mirror_latest_to_top_level(src: Path, dst: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("data_raw"),
-                        help="Directory containing BO_data_pull*.csv files.")
+                        help="Directory containing clinical_data.csv.")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    csv_files = sorted(args.data_dir.glob("BO_data_pull*.csv"))
-    if not csv_files:
-        log.error("No BO_data_pull*.csv files found in %s", args.data_dir)
+    master_csv = args.data_dir / "clinical_data.csv"
+    if not master_csv.exists():
+        log.error("Master CSV not found: %s", master_csv)
         return 2
 
-    log.info("Loading %d clinical CSV(s) from %s", len(csv_files), args.data_dir)
-    parts = []
-    for p in csv_files:
-        part = load_encounters(p)
-        log.info("  %s: %d encounters", p.name, len(part))
-        parts.append(part)
-    df_all = pd.concat(parts, ignore_index=True)
-    log.info("Concatenated: %d total encounters", len(df_all))
+    df_all = load_encounters(master_csv)
+    log.info("Master CSV loaded: %d distinct encounters", len(df_all))
 
     df_all = compute_return_visits(df_all)
     top_conditions = _top_conditions(df_all)

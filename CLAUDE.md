@@ -19,15 +19,23 @@ Recharts. Python 3.12 + pandas for the pipeline.
 - `src/components/Shell.tsx` — masthead, footer, nav.
 
 ## Data
-- `data_raw/BO_data_pull.csv` — FY26 clinical encounters (~129K, partial year through
-  Apr 2026).
-- `data_raw/BO_data_pull_FY{17..25}.csv` — historical clinical encounters, one file
-  per fiscal year, ~130-155K each. Full 10-year span: ~1.34M encounters.
+- `data_raw/clinical_data.csv` — single master clinical feed, FY17 → present
+  (~973 MB, 1.46M rows). **Rows are not unique by Encounter # (CSN)** — the
+  export replicates identical rows for a subset of encounters. `load_encounters`
+  collapses each CSN to one row at load time (`drop_duplicates(keep="first")`),
+  yielding ~389K distinct encounters. Every downstream metric (counts, rates,
+  medians, groupings) then operates on one-row-per-encounter data automatically.
 - `data_raw/BO_billing_FY26.csv` + `BO_billing_FY17_FY25.csv` — encounter-billing
   data (shared schema). Used in Phase 4 for charge/collection/RVU roll-ups.
 - UF fiscal year runs Jul 1 → Jun 30 (e.g. FY26 = Jul 1 2025 → Jun 30 2026).
   `load_encounters` derives `fiscal_year` and `fy_quarter` columns from Arrival
   DateTime.
+- **CSN-distinct semantics**: `Encounters` = `df["Encounter # (CSN)"].nunique()`.
+  `LWBS` = distinct CSNs with `LWBS Flag == "Y"`. Admits = distinct CSNs with
+  `Final ED Disposition ∈ {"ADMIT", "PRESENTED TO ADMIT SERVICE"}`. Discharges
+  = distinct CSNs with `Final ED Disposition == "DISCHARGE"`. Because dedup
+  runs at load time these all reduce to simple pandas ops — no per-metric
+  CSN-awareness logic needed.
 - BO pull lacks `Admit Unit` and `Admit Service` columns — MD→Order section
   in Daily Report shows a graceful empty state until those are added.
 
