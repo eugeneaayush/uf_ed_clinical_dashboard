@@ -13,6 +13,7 @@ import {
   Legend,
   ComposedChart,
   ReferenceLine,
+  Area,
 } from "recharts";
 import clsx from "clsx";
 import { Card } from "../components/Card";
@@ -46,6 +47,14 @@ import {
 import { LOCATION_COLOR } from "../lib/palette";
 
 const SITES_ORDER = ["ADULT ED", "PEDS ED", "KANAPAHA ED", "SPRING ED", "ONH ED"];
+
+// Dark-mode chart tokens. Kept as constants since Recharts primitives accept
+// raw strokes/fills rather than Tailwind classes.
+const AXIS_TICK = "#71717a"; // zinc-500
+const GRID_STROKE = "#27272a"; // zinc-800
+const TOOLTIP_CURSOR = "rgba(113,113,122,0.12)"; // zinc-500 at 12%
+const MUTED_FILL = "#3f3f46"; // zinc-700 (current/in-progress bar)
+const FALLBACK_SERIES = "#52525b"; // zinc-600
 
 export function MetricDetail() {
   const { slug = "" } = useParams();
@@ -114,19 +123,19 @@ function MetricHeader({ metric }: { metric: MetricRegistryEntry }) {
       <div className="flex flex-wrap items-center gap-2 mb-4 text-[12.5px]">
         <Link
           to="/metrics"
-          className="text-slate-500 hover:text-slate-900 transition-colors"
+          className="text-zinc-400 hover:text-zinc-100 transition-colors"
         >
           ← All Metrics
         </Link>
-        <span aria-hidden className="text-slate-300">/</span>
-        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-slate-600">
+        <span aria-hidden className="text-zinc-700">/</span>
+        <span className="inline-flex items-center rounded-full bg-zinc-900 ring-1 ring-zinc-800 px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-zinc-400">
           {metric.category}
         </span>
         {index.data && (
           <select
             value={metric.slug}
             onChange={(e) => nav(`/metrics/${e.target.value}`)}
-            className="ml-auto rounded-full bg-slate-50 ring-1 ring-slate-200 px-3 py-1 text-[12.5px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-uf-blue"
+            className="ml-auto rounded-full bg-zinc-900 ring-1 ring-zinc-800 hover:ring-zinc-700 px-3 py-1 text-[12.5px] font-medium text-zinc-100 focus:outline-none focus:ring-2 focus:ring-uf-blue"
           >
             {groupByCategory(index.data.metrics).map(([cat, items]) => (
               <optgroup key={cat} label={cat}>
@@ -246,16 +255,24 @@ function SingleSliceView({ payload }: { payload: MetricPayload }) {
               }))}
               margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
             >
-              <CartesianGrid vertical={false} />
+              <defs>
+                <linearGradient id="metricActualFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0021A5" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#0021A5" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} stroke={GRID_STROKE} />
               <XAxis
                 dataKey="year_month"
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: AXIS_TICK, fontSize: 10.5 }}
                 tickFormatter={fmtYearMonth}
               />
               <YAxis
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: AXIS_TICK, fontSize: 10.5 }}
                 tickFormatter={(v) => fmtByUnit(v, m.unit)}
               />
               <Tooltip
@@ -263,14 +280,23 @@ function SingleSliceView({ payload }: { payload: MetricPayload }) {
                   <ChartTooltip valueFormatter={(v) => fmtByUnit(v, m.unit)} />
                 }
                 labelFormatter={fmtYearMonth}
+                cursor={{ fill: TOOLTIP_CURSOR }}
               />
-              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: AXIS_TICK }} />
+              <Area
+                type="monotone"
+                dataKey="actual"
+                stroke="none"
+                fill="url(#metricActualFill)"
+                legendType="none"
+                isAnimationActive={false}
+              />
               <Bar dataKey="actual" name="Actual" radius={[6, 6, 0, 0]}>
                 {monthly.map((r, i) => (
                   <Cell
                     key={i}
-                    fill={r.is_current_month ? "#cad5e2" : "#0021A5"}
-                    opacity={r.is_current_month ? 0.55 : 1}
+                    fill={r.is_current_month ? MUTED_FILL : "#0021A5"}
+                    opacity={r.is_current_month ? 0.7 : 1}
                   />
                 ))}
               </Bar>
@@ -280,29 +306,29 @@ function SingleSliceView({ payload }: { payload: MetricPayload }) {
                 name="Forecast"
                 stroke="#FA4616"
                 strokeWidth={2.5}
-                strokeDasharray="5 4"
-                dot={{ r: 2.5 }}
+                strokeDasharray="4 4"
+                dot={{ r: 2.5, fill: "#FA4616", stroke: "none" }}
                 connectNulls={false}
               />
               <Line
                 type="monotone"
                 dataKey="runrate"
                 name="Current Month Run-Rate"
-                stroke="#62748e"
+                stroke={AXIS_TICK}
                 strokeWidth={2}
                 strokeDasharray="2 4"
-                dot={{ r: 3 }}
+                dot={{ r: 3, fill: AXIS_TICK, stroke: "none" }}
                 connectNulls={false}
               />
               {current && (
                 <ReferenceLine
                   x={current.year_month}
-                  stroke="#62748e"
+                  stroke={AXIS_TICK}
                   strokeDasharray="2 2"
                   label={{
                     value: "In Progress",
                     position: "top",
-                    fill: "#62748e",
+                    fill: AXIS_TICK,
                     fontSize: 10,
                     fontFamily: "IBM Plex Mono",
                   }}
@@ -342,56 +368,7 @@ function SingleSliceView({ payload }: { payload: MetricPayload }) {
           title="Subcomponent Breakdown"
           sub={`${m.label} decomposes into these time segments. Values reflect the current slice.`}
         >
-          <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={payload.subcomponents.map((s) => ({
-                  label: s.label,
-                  value: s.value,
-                }))}
-                layout="vertical"
-                margin={{ top: 4, right: 32, bottom: 4, left: 4 }}
-              >
-                <CartesianGrid horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => fmtByUnit(v, "min")}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  width={220}
-                  tickFormatter={(v) => truncate(v, 32)}
-                />
-                <Tooltip
-                  content={<ChartTooltip valueFormatter={(v) => fmtByUnit(v, "min")} />}
-                  cursor={{ fill: "#f1f5f9" }}
-                />
-                <Bar dataKey="value" fill="#0021A5" radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-3 text-[11.5px] text-slate-500">
-            Each subcomponent is itself a drillable metric — click a bar label to navigate.
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {payload.subcomponents.map((s) => (
-              <Link
-                key={s.slug}
-                to={`/metrics/${s.slug}`}
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 ring-1 ring-slate-200 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 hover:bg-uf-blue/5 hover:ring-uf-blue/30 hover:text-uf-blue transition-colors"
-              >
-                <span>{s.label}</span>
-                <span className="font-mono text-[10.5px] text-slate-500">
-                  {fmtByUnit(s.value, "min")}
-                </span>
-              </Link>
-            ))}
-          </div>
+          <SubcomponentTable payload={payload} />
         </Card>
       )}
 
@@ -435,46 +412,117 @@ function MonthlyRow({
     <tr>
       <td>
         <div className="flex items-center gap-2">
-          <span className="font-medium text-slate-900">
+          <span className="font-medium text-zinc-100">
             {fmtYearMonth(row.year_month)}
           </span>
           {row.is_current_month && (
-            <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-600">
+            <span className="inline-flex items-center rounded-md bg-zinc-900 ring-1 ring-zinc-800 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-400">
               In progress · {row.days_observed ?? "?"}/{row.days_in_month}d
             </span>
           )}
         </div>
       </td>
       <td className="text-right num">{fmtByUnit(row.value, unit)}</td>
-      <td className="text-right num text-slate-500">
+      <td className="text-right num text-zinc-400">
         {fmtByUnit(row.forecast, unit)}
       </td>
       <td
         className={clsx(
           "text-right num font-semibold",
           row.delta == null
-            ? "text-slate-400"
+            ? "text-zinc-500"
             : deltaIsBad(row.delta)
               ? "text-uf-orange"
-              : "text-uf-blue"
+              : "text-blue-400"
         )}
       >
         {fmtDeltaByUnit(row.delta, unit)}
       </td>
       <td className="text-right">
         {row.delta == null ? (
-          <span className="text-slate-400">—</span>
+          <span className="text-zinc-500">—</span>
         ) : deltaIsBad(row.delta) ? (
-          <span className="inline-flex items-center rounded-md bg-uf-orange/10 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-uf-orange">
+          <span className="inline-flex items-center rounded-md bg-uf-orange/10 ring-1 ring-uf-orange/30 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-uf-orange">
             Worse
           </span>
         ) : (
-          <span className="inline-flex items-center rounded-md bg-uf-blue/10 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-uf-blue">
+          <span className="inline-flex items-center rounded-md bg-uf-blue/15 ring-1 ring-uf-blue/40 px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-blue-400">
             Better
           </span>
         )}
       </td>
     </tr>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   Subcomponent breakdown — compact table with inline contribution bars.
+   --------------------------------------------------------------------------- */
+
+function SubcomponentTable({ payload }: { payload: MetricPayload }) {
+  const items = payload.subcomponents;
+  const parent = payload.overall ?? items.reduce((s, x) => s + (x.value ?? 0), 0);
+  const maxValue = items.reduce(
+    (m, x) => Math.max(m, x.value ?? 0),
+    0
+  );
+
+  return (
+    <div>
+      <div className="overflow-x-auto thin-scroll">
+        <table className="data-table min-w-[640px]">
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th className="text-right">Value</th>
+              <th className="text-right">% of parent</th>
+              <th>Contribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((s) => {
+              const pct =
+                parent && parent > 0 && s.value != null
+                  ? (s.value / parent) * 100
+                  : null;
+              const barWidth =
+                maxValue > 0 && s.value != null
+                  ? Math.max(2, (s.value / maxValue) * 100)
+                  : 0;
+              return (
+                <tr key={s.slug}>
+                  <td>
+                    <Link
+                      to={`/metrics/${s.slug}`}
+                      className="font-medium text-zinc-100 hover:text-uf-blue transition-colors"
+                    >
+                      {truncate(s.label, 48)}
+                    </Link>
+                  </td>
+                  <td className="text-right num font-semibold text-zinc-100">
+                    {fmtByUnit(s.value, "min")}
+                  </td>
+                  <td className="text-right num text-zinc-400">
+                    {pct == null ? "—" : `${pct.toFixed(1)}%`}
+                  </td>
+                  <td className="min-w-[200px]">
+                    <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full bg-uf-blue"
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 text-[11.5px] text-zinc-500">
+        Each subcomponent is itself a drillable metric — click a name to navigate.
+      </div>
+    </div>
   );
 }
 
@@ -502,11 +550,17 @@ function LocationBreakdown({
       <div className="lg:col-span-3 h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="site" tickLine={false} axisLine={false} />
+            <CartesianGrid vertical={false} stroke={GRID_STROKE} />
+            <XAxis
+              dataKey="site"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: AXIS_TICK, fontSize: 10.5 }}
+            />
             <YAxis
               tickLine={false}
               axisLine={false}
+              tick={{ fill: AXIS_TICK, fontSize: 10.5 }}
               tickFormatter={(v) => fmtByUnit(v, payload.metric.unit)}
             />
             <Tooltip
@@ -515,7 +569,7 @@ function LocationBreakdown({
                   valueFormatter={(v) => fmtByUnit(v, payload.metric.unit)}
                 />
               }
-              cursor={{ fill: "#f1f5f9" }}
+              cursor={{ fill: TOOLTIP_CURSOR }}
             />
             {overall != null && (
               <ReferenceLine
@@ -533,7 +587,7 @@ function LocationBreakdown({
             )}
             <Bar dataKey="value" radius={[6, 6, 0, 0]}>
               {chartData.map((d) => (
-                <Cell key={d.site} fill={LOCATION_COLOR[d.site] ?? "#cad5e2"} />
+                <Cell key={d.site} fill={LOCATION_COLOR[d.site] ?? MUTED_FILL} />
               ))}
             </Bar>
           </BarChart>
@@ -562,9 +616,9 @@ function LocationBreakdown({
                     <span className="flex items-center gap-2">
                       <span
                         className="h-2 w-2 rounded-sm"
-                        style={{ backgroundColor: LOCATION_COLOR[r.location] ?? "#cad5e2" }}
+                        style={{ backgroundColor: LOCATION_COLOR[r.location] ?? MUTED_FILL }}
                       />
-                      <span className="font-medium text-slate-900">{r.location}</span>
+                      <span className="font-medium text-zinc-100">{r.location}</span>
                     </span>
                   </td>
                   <td className="text-right num">{fmtByUnit(r.value, payload.metric.unit)}</td>
@@ -572,15 +626,15 @@ function LocationBreakdown({
                     className={clsx(
                       "text-right num",
                       delta == null
-                        ? "text-slate-400"
+                        ? "text-zinc-500"
                         : deltaIsBad(delta)
                           ? "text-uf-orange"
-                          : "text-uf-blue"
+                          : "text-blue-400"
                     )}
                   >
                     {fmtDeltaByUnit(delta, payload.metric.unit)}
                   </td>
-                  <td className="text-right num text-slate-500">{fmtInt(r.n)}</td>
+                  <td className="text-right num text-zinc-400">{fmtInt(r.n)}</td>
                 </tr>
               );
             })}
@@ -623,11 +677,13 @@ function ConditionBreakdown({ payload }: { payload: MetricPayload }) {
                 nav(`/metrics/${payload.metric.slug}?${next.toString()}`);
               }}
             >
-              <td className="font-medium text-slate-900">{r.condition}</td>
-              <td className="text-right num font-semibold">
-                {fmtByUnit(r.value, payload.metric.unit)}
+              <td className="font-medium text-zinc-100">{r.condition}</td>
+              <td className="text-right">
+                <span className="inline-flex items-center rounded-md bg-uf-blue/15 ring-1 ring-uf-blue/30 px-2 py-0.5 font-mono text-[11.5px] font-semibold text-blue-400 tabular">
+                  {fmtByUnit(r.value, payload.metric.unit)}
+                </span>
               </td>
-              <td className="text-right num text-slate-500">{fmtInt(r.n)}</td>
+              <td className="text-right num text-zinc-400">{fmtInt(r.n)}</td>
             </tr>
           ))}
         </tbody>
@@ -676,7 +732,7 @@ function CompareView({
         metric={registry}
         series={sitesPayloads.map((s) => ({
           label: s.site,
-          color: LOCATION_COLOR[s.site] ?? "#94a3b8",
+          color: LOCATION_COLOR[s.site] ?? FALLBACK_SERIES,
           monthly: s.payload.data?.monthly ?? [],
         }))}
       />
@@ -685,7 +741,7 @@ function CompareView({
         metric={registry}
         panels={sitesPayloads.map((s) => ({
           label: s.site,
-          color: LOCATION_COLOR[s.site] ?? "#94a3b8",
+          color: LOCATION_COLOR[s.site] ?? FALLBACK_SERIES,
           monthly: s.payload.data?.monthly ?? [],
         }))}
       />
@@ -715,8 +771,14 @@ function CompareView({
 }
 
 const CONDITION_PALETTE = [
-  "#0021A5", "#FA4616", "#155dfc", "#1d293d", "#51a2ff",
-  "#ff6900", "#62748e", "#8ec5ff",
+  "#0021A5", // UF blue
+  "#FA4616", // UF orange
+  "#67e8f9", // cyan-300
+  "#c4b5fd", // violet-400
+  "#6ee7b7", // emerald-400
+  "#60a5fa", // blue-400
+  "#fdba74", // orange-300
+  "#a1a1aa", // zinc-400
 ];
 
 interface CompareSeries {
@@ -754,23 +816,26 @@ function OverlayCompare({
       <div className="h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={wide} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} />
+            <CartesianGrid vertical={false} stroke={GRID_STROKE} />
             <XAxis
               dataKey="year_month"
               tickLine={false}
               axisLine={false}
+              tick={{ fill: AXIS_TICK, fontSize: 10.5 }}
               tickFormatter={fmtYearMonth}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
+              tick={{ fill: AXIS_TICK, fontSize: 10.5 }}
               tickFormatter={(v) => fmtByUnit(v, metric.unit)}
             />
             <Tooltip
               content={<ChartTooltip valueFormatter={(v) => fmtByUnit(v, metric.unit)} />}
               labelFormatter={fmtYearMonth}
+              cursor={{ stroke: AXIS_TICK, strokeDasharray: "2 3" }}
             />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: AXIS_TICK }} />
             {series.map((s) => (
               <Line
                 key={s.label}
@@ -779,7 +844,7 @@ function OverlayCompare({
                 name={s.label}
                 stroke={s.color}
                 strokeWidth={2.5}
-                dot={{ r: 2 }}
+                dot={{ r: 2, fill: s.color, stroke: "none" }}
                 connectNulls
               />
             ))}
@@ -808,11 +873,12 @@ function SmallMultiplesCompare({
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={panel.monthly} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                  <CartesianGrid vertical={false} />
+                  <CartesianGrid vertical={false} stroke={GRID_STROKE} />
                   <XAxis
                     dataKey="year_month"
                     tickLine={false}
                     axisLine={false}
+                    tick={{ fill: AXIS_TICK, fontSize: 10 }}
                     tickFormatter={fmtYearMonth}
                     interval="preserveStartEnd"
                     minTickGap={20}
@@ -820,19 +886,21 @@ function SmallMultiplesCompare({
                   <YAxis
                     tickLine={false}
                     axisLine={false}
+                    tick={{ fill: AXIS_TICK, fontSize: 10 }}
                     tickFormatter={(v) => fmtByUnit(v, metric.unit)}
                     width={48}
                   />
                   <Tooltip
                     content={<ChartTooltip valueFormatter={(v) => fmtByUnit(v, metric.unit)} />}
                     labelFormatter={fmtYearMonth}
+                    cursor={{ fill: TOOLTIP_CURSOR }}
                   />
                   <Bar dataKey="value" name="Actual" radius={[4, 4, 0, 0]}>
                     {panel.monthly.map((r, i) => (
                       <Cell
                         key={i}
                         fill={panel.color}
-                        opacity={r.is_current_month ? 0.35 : 1}
+                        opacity={r.is_current_month ? 0.4 : 1}
                       />
                     ))}
                   </Bar>
@@ -842,8 +910,8 @@ function SmallMultiplesCompare({
                     name="Forecast"
                     stroke="#FA4616"
                     strokeWidth={2}
-                    strokeDasharray="4 3"
-                    dot={{ r: 1.5 }}
+                    strokeDasharray="4 4"
+                    dot={{ r: 1.5, fill: "#FA4616", stroke: "none" }}
                     connectNulls
                   />
                 </ComposedChart>
