@@ -12,3 +12,9 @@ dist-ssr/
 data_raw/
 __pycache__/
 *.pyc
+
+# Local vendor drop (Tailwind Plus / Catalyst UI Kits) - not part of the app
+UI Kits/
+
+# Claude Code plan files + session scratch
+.claude/
