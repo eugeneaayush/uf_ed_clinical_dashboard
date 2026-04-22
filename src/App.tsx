@@ -6,6 +6,7 @@ import { MetricDetail } from "./pages/MetricDetail";
 import { ConditionsIndex } from "./pages/ConditionsIndex";
 import { ConditionDetail } from "./pages/ConditionDetail";
 import { DailyReport } from "./pages/DailyReport";
+import { SplitFlowBacktest } from "./pages/SplitFlowBacktest";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/conditions" element={<ConditionsIndex />} />
         <Route path="/conditions/:slug" element={<ConditionDetail />} />
         <Route path="/daily" element={<DailyReport />} />
+        <Route path="/split-flow" element={<SplitFlowBacktest />} />
         {/* Legacy paths → new homes */}
         <Route path="/los" element={<Navigate to="/metrics/ed-los" replace />} />
         <Route path="/stroke" element={<Navigate to="/conditions/stroke-cva" replace />} />

@@ -7,6 +7,7 @@ const TABS = [
   { to: "/metrics", num: "02", label: "Metrics" },
   { to: "/conditions", num: "03", label: "Conditions" },
   { to: "/daily", num: "04", label: "Daily Report" },
+  { to: "/split-flow", num: "05", label: "Split Flow Backtest" },
 ];
 
 /** Keep ?loc and ?cmp filters when switching top tabs. Drop ?tab (sub-tab). */
