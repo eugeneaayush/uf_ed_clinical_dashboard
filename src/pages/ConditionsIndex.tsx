@@ -137,8 +137,8 @@ function ConditionsTable({
   return (
     <div className="overflow-x-auto thin-scroll">
       <table className="data-table min-w-[1000px]">
-        <thead>
-          <tr>
+        <thead className="sticky top-0 bg-zinc-950">
+          <tr className="border-b border-zinc-800">
             <SortTh k="name" label="Condition" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <SortTh k="encounters" label="Encounters" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
             <SortTh k="admit_rate_pct" label="Admit %" sortKey={sortKey} sortDir={sortDir} onSort={onSort} right />
@@ -185,16 +185,22 @@ function SortTh({
         type="button"
         onClick={() => onSort(k)}
         className={clsx(
-          "inline-flex items-center gap-1 hover:text-slate-900 transition-colors",
-          active && "text-uf-blue"
+          "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors",
+          active
+            ? "bg-zinc-800 text-uf-blue"
+            : "text-zinc-500 hover:text-zinc-100"
         )}
       >
         {label}
-        {active && (
-          <span aria-hidden className="font-mono text-[9px]">
-            {sortDir === "asc" ? "↑" : "↓"}
-          </span>
-        )}
+        <span
+          aria-hidden
+          className={clsx(
+            "font-mono text-[10px]",
+            active ? "text-uf-blue" : "text-zinc-600"
+          )}
+        >
+          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
       </button>
     </th>
   );
@@ -204,33 +210,33 @@ function ConditionRowView({ row }: { row: ConditionRow }) {
   const nav = useNavigate();
   return (
     <tr
-      className="cursor-pointer"
+      className="cursor-pointer bg-zinc-900/40 hover:bg-zinc-800/60 transition-colors"
       onClick={() => nav(`/conditions/${row.slug}`)}
     >
       <td>
-        <span className="font-medium text-slate-900">{row.name}</span>
+        <span className="font-medium text-zinc-100">{row.name}</span>
       </td>
-      <td className="text-right num">{fmtInt(row.encounters)}</td>
-      <td className="text-right num">{fmtPct(row.admit_rate_pct)}</td>
-      <td className="text-right num">{fmtMinutes(row.median_ed_los_min)}</td>
-      <td className="text-right num">{fmtPct(row.lwbs_rate_pct)}</td>
-      <td className="text-right num">{fmtPct(row.lbtc_rate_pct)}</td>
-      <td className="text-right num font-semibold text-uf-orange">
+      <td className="text-right num font-mono text-zinc-300">{fmtInt(row.encounters)}</td>
+      <td className="text-right num font-mono text-zinc-300">{fmtPct(row.admit_rate_pct)}</td>
+      <td className="text-right num font-mono text-zinc-300">{fmtMinutes(row.median_ed_los_min)}</td>
+      <td className="text-right num font-mono text-zinc-300">{fmtPct(row.lwbs_rate_pct)}</td>
+      <td className="text-right num font-mono text-zinc-300">{fmtPct(row.lbtc_rate_pct)}</td>
+      <td className="text-right num font-mono font-semibold text-orange-400">
         {fmtPct(row.return_72h_any_pct)}
       </td>
-      <td className="text-right num font-semibold text-uf-blue">
+      <td className="text-right num font-mono font-semibold text-blue-400">
         {fmtPct(row.return_72h_same_pct)}
       </td>
-      <td className="text-right num font-semibold text-uf-orange">
+      <td className="text-right num font-mono font-semibold text-orange-400">
         {fmtPct(row.return_7d_any_pct)}
       </td>
-      <td className="text-right num font-semibold text-uf-blue">
+      <td className="text-right num font-mono font-semibold text-blue-400">
         {fmtPct(row.return_7d_same_pct)}
       </td>
-      <td className="text-right num font-semibold text-uf-orange">
+      <td className="text-right num font-mono font-semibold text-orange-400">
         {fmtPct(row.return_30d_any_pct)}
       </td>
-      <td className="text-right num font-semibold text-uf-blue">
+      <td className="text-right num font-mono font-semibold text-blue-400">
         {fmtPct(row.return_30d_same_pct)}
       </td>
     </tr>
