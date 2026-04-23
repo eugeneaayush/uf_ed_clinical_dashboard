@@ -48,36 +48,36 @@ export function MetricsIndex() {
         {CATEGORY_ORDER.filter((c) => grouped.has(c)).map((cat, ci) => (
           <section key={cat}>
             <div className="flex items-baseline gap-3 mb-3">
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-uf-blue">
+              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-400">
                 {String(ci + 1).padStart(2, "0")}
               </span>
-              <h2 className="font-display text-[22px] font-extrabold tracking-tight text-slate-900">
+              <h2 className="font-display text-[22px] font-extrabold tracking-tight text-zinc-900 dark:text-white">
                 {cat}
               </h2>
             </div>
-            <p className="text-[12.5px] text-slate-500 mb-4 max-w-2xl">
+            <p className="text-[12.5px] text-zinc-500 dark:text-zinc-600 mb-4 max-w-2xl">
               {CATEGORY_COPY[cat]}
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {grouped.get(cat)!.map((m) => (
                 <button
                   key={m.slug}
                   type="button"
                   onClick={() => nav(`/metrics/${m.slug}`)}
-                  className="group text-left rounded-2xl ring-1 ring-slate-200 bg-white hover:ring-uf-blue/40 hover:shadow-card-hover transition-all p-4"
+                  className="group relative flex flex-col text-left bg-white dark:bg-white shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl hover:ring-zinc-950/10 dark:hover:ring-white/20 hover:shadow-md transition-all p-5"
                 >
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <span className="font-display text-[15px] font-bold text-slate-900 group-hover:text-uf-blue transition-colors">
+                  <div className="flex items-start justify-between gap-3 mb-1.5 w-full">
+                    <span className="font-display text-[15px] font-bold text-zinc-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                       {m.label}
                     </span>
                     <UnitBadge unit={m.unit} />
                   </div>
-                  <p className="text-[12px] text-slate-500 leading-relaxed line-clamp-2">
+                  <p className="text-[12px] text-zinc-500 dark:text-zinc-600 leading-relaxed line-clamp-2 mt-1">
                     {m.description}
                   </p>
                   {m.subcomponent_slugs.length > 0 && (
-                    <div className="mt-2 font-mono text-[10.5px] text-slate-500">
+                    <div className="mt-3 font-mono text-[10.5px] text-zinc-600 dark:text-zinc-500">
                       {m.subcomponent_slugs.length} subcomponents
                     </div>
                   )}

@@ -71,7 +71,7 @@ export function Shell() {
             
             {meta.data && (
               <SidebarSection>
-                <div className="px-3 py-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl ring-1 ring-zinc-900/5 dark:ring-white/10 flex flex-col gap-3">
+                <div className="px-3 py-4 bg-zinc-50 dark:bg-zinc-100/50 rounded-xl ring-1 ring-zinc-900/5 dark:ring-white/10 flex flex-col gap-3">
                   <div>
                     <Badge color="orange">Clinical Dashboard</Badge>
                   </div>
@@ -105,7 +105,7 @@ export function Shell() {
                 className="h-8 w-8 object-contain rounded-full bg-zinc-100 ring-1 ring-zinc-200"
               />
               <div className="text-[10px] leading-tight text-zinc-500">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">UF College of Medicine</span>
+                <span className="font-medium text-zinc-700 dark:text-zinc-700">UF College of Medicine</span>
                 <br />
                 Dept of Emergency Medicine
               </div>

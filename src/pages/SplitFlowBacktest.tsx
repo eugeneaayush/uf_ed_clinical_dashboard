@@ -16,10 +16,10 @@ export function SplitFlowBacktest() {
   return (
     <div className="space-y-10 animate-fade-up">
       <div>
-        <h2 className="font-display text-[32px] font-extrabold tracking-tight text-slate-900">
+        <h2 className="font-display text-[32px] font-extrabold tracking-tight text-zinc-900 dark:text-white">
           Split Flow Backtest Results
         </h2>
-        <p className="mt-2 text-[15px] text-slate-600 max-w-3xl">
+        <p className="mt-2 text-[15px] text-zinc-600 dark:text-zinc-600 max-w-3xl">
           Based on the simulation dataset of 15,424 distinct ADULT ED encounters
           from 07/01/2025 to 04/19/2026. This data models the expected throughput
           if the proposed Split Flow model had been fully implemented.
@@ -27,7 +27,7 @@ export function SplitFlowBacktest() {
       </div>
 
       <section>
-        <h3 className="font-display text-[18px] font-bold text-slate-900 mb-4">
+        <h3 className="font-display text-[18px] font-bold text-zinc-900 dark:text-white mb-4">
           Headline KPIs (Simulated vs Actual)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

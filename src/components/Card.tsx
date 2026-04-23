@@ -26,7 +26,7 @@ export function Card({
   return (
     <section 
       className={clsx(
-        "flex flex-col bg-white dark:bg-zinc-900 shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl overflow-hidden",
+        "flex flex-col bg-white dark:bg-white shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl overflow-hidden",
         className
       )}
     >

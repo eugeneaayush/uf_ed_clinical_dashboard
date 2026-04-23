@@ -21,7 +21,7 @@ export function LoadingDots({ className }: { className?: string }) {
 
 export function ErrorState({ error }: { error: Error }) {
   return (
-    <div className="bg-white dark:bg-zinc-900 shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl p-8 text-center max-w-lg mx-auto mt-12">
+    <div className="bg-white dark:bg-white shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl p-8 text-center max-w-lg mx-auto mt-12">
       <Heading className="!text-lg text-red-600">Couldn’t load data</Heading>
       <Text className="mt-2">{error.message}</Text>
     </div>

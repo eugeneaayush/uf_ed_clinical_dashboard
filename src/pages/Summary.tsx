@@ -397,26 +397,26 @@ export function Summary() {
 function KpiHeaderRow({ kpis }: { kpis: SummaryKpi[] }) {
   const nav = useNavigate();
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       {kpis.map((k, i) => {
         const clickable = !!k.link;
         const content = (
           <div
             className={[
-              "relative rounded-2xl ring-1 bg-white px-5 py-4 transition-all",
+              "relative flex flex-col bg-white dark:bg-white shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl px-5 py-4 transition-all",
               clickable
-                ? "ring-slate-200 hover:ring-uf-blue/40 hover:shadow-card-hover cursor-pointer"
-                : "ring-slate-200",
+                ? "hover:ring-zinc-950/10 dark:hover:ring-white/20 hover:shadow-md cursor-pointer"
+                : "",
             ].join(" ")}
           >
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-slate-500 mb-1">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-600 mb-1">
               {String(i + 1).padStart(2, "0")} · {k.label}
             </div>
-            <div className="font-display text-[30px] font-extrabold leading-none tracking-tighter tabular text-uf-blue">
+            <div className="font-display text-[30px] font-extrabold leading-none tracking-tighter tabular text-indigo-600 dark:text-indigo-400">
               {fmtInt(k.value)}
             </div>
             {clickable && (
-              <div className="mt-2 font-mono text-[10px] text-slate-500 group-hover:text-uf-blue">
+              <div className="mt-2 font-mono text-[10px] text-zinc-600 dark:text-zinc-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
                 Drill into {k.link} →
               </div>
             )}
