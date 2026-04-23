@@ -1,4 +1,7 @@
 import clsx from "clsx";
+import { Heading } from "./catalyst/heading";
+import { Text } from "./catalyst/text";
+import { Badge } from "./catalyst/badge";
 
 export function LoadingDots({ className }: { className?: string }) {
   return (
@@ -7,7 +10,7 @@ export function LoadingDots({ className }: { className?: string }) {
         {[0, 1, 2].map((i) => (
           <span
             key={i}
-            className="h-2 w-2 rounded-full bg-uf-blue animate-pulse"
+            className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"
             style={{ animationDelay: `${i * 0.18}s` }}
           />
         ))}
@@ -18,26 +21,21 @@ export function LoadingDots({ className }: { className?: string }) {
 
 export function ErrorState({ error }: { error: Error }) {
   return (
-    <div className="tile p-8 text-center">
-      <div className="font-display text-[16px] font-bold text-slate-900">
-        Couldn’t load data
-      </div>
-      <div className="mt-2 text-[13px] text-slate-500">{error.message}</div>
+    <div className="bg-white dark:bg-zinc-900 shadow-sm ring-1 ring-zinc-950/5 dark:ring-white/10 rounded-xl p-8 text-center max-w-lg mx-auto mt-12">
+      <Heading className="!text-lg text-red-600">Couldn’t load data</Heading>
+      <Text className="mt-2">{error.message}</Text>
     </div>
   );
 }
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex items-center justify-center py-16 text-[13px] text-slate-500">
+    <div className="flex items-center justify-center py-16 text-sm text-zinc-500">
       {message}
     </div>
   );
 }
 
-/**
- * Numbered page section header — template "01 / Programs & Training" pattern.
- */
 export function PageHeader({
   num,
   kicker,
@@ -51,18 +49,18 @@ export function PageHeader({
 }) {
   return (
     <header className="mb-8 md:mb-10">
-      <div className="section-tag">
-        <span className="section-tag-num">{num}</span>
-        <span aria-hidden className="h-3 w-px bg-uf-blue/30" />
-        <span>{kicker}</span>
+      <div className="flex items-center gap-3">
+        <Badge color="indigo" className="font-mono">{num}</Badge>
+        <span aria-hidden className="h-3 w-px bg-zinc-300 dark:bg-zinc-700" />
+        <Text className="font-medium !text-indigo-600 dark:!text-indigo-400">{kicker}</Text>
       </div>
-      <h2 className="mt-5 font-display text-[34px] md:text-[44px] font-extrabold leading-[1.02] tracking-tighter text-slate-900 max-w-3xl">
+      <Heading level={1} className="mt-5 !text-3xl md:!text-4xl !tracking-tight max-w-3xl">
         {title}
-      </h2>
+      </Heading>
       {subtitle && (
-        <p className="mt-3 text-[14px] text-slate-600 max-w-2xl leading-relaxed">
+        <Text className="mt-3 max-w-2xl text-base leading-relaxed">
           {subtitle}
-        </p>
+        </Text>
       )}
     </header>
   );

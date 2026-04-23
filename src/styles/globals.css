@@ -1,50 +1,74 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* =========================================================================
-   Base
-   ========================================================================= */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Anybody", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-uf-blue: #0021A5;
+  --color-uf-blue-deep: #001470;
+  --color-uf-blue-ink: #193cb8;
+  --color-uf-orange: #FA4616;
+  --color-uf-orange-deep: #c73611;
+
+  --color-chart-1: #0021A5;
+  --color-chart-2: #FA4616;
+  --color-chart-3: #155dfc;
+  --color-chart-4: #1d293d;
+  --color-chart-5: #3080ff;
+
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+  --radius-6xl: 3rem;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 43, 0.04), 0 0 0 1px rgba(15, 23, 43, 0.05);
+  --shadow-card-hover: 0 6px 20px rgba(15, 23, 43, 0.08), 0 0 0 1px rgba(15, 23, 43, 0.06);
+
+  --animate-fade-up: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    font-feature-settings: "ss01", "cv11";
   }
-
+  
   body {
-    @apply bg-white text-slate-900 font-sans;
+    background-color: var(--color-white);
+    color: var(--color-slate-900);
+    font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
   }
 
+  @variant dark {
+    body {
+      background-color: var(--color-zinc-950);
+      color: var(--color-zinc-50);
+    }
+  }
+
   h1, h2, h3, h4 {
-    @apply font-display tracking-tighter;
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
-  :focus {
-    outline: none;
-  }
-  :focus-visible {
-    outline: 2px solid #0021A5;
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-
-  /* Recharts overrides — match template minimalism */
+  /* Recharts overrides */
   .recharts-cartesian-axis-tick-value,
   .recharts-legend-item-text {
-    font-family: "IBM Plex Mono", ui-monospace, monospace !important;
+    font-family: var(--font-mono) !important;
     font-size: 10.5px !important;
-    fill: #62748e !important;
+    fill: var(--color-slate-500) !important;
     letter-spacing: -0.01em !important;
-  }
-  .recharts-legend-item-text {
-    color: #62748e !important;
   }
   .recharts-cartesian-grid-horizontal line,
   .recharts-cartesian-grid-vertical line {
-    stroke: #e2e8f0 !important;
+    stroke: var(--color-slate-200) !important;
     stroke-dasharray: 0 !important;
   }
   .recharts-tooltip-wrapper {
@@ -52,119 +76,16 @@
   }
 }
 
-/* =========================================================================
-   Components (template-inspired primitives)
-   ========================================================================= */
 @layer components {
-  /* Orange pill badge — template hero pattern */
-  .badge-orange {
-    @apply inline-flex items-center rounded-full bg-uf-orange/10 px-3 py-1 text-[12px] font-semibold text-uf-orange ring-1 ring-uf-orange/30;
-  }
-
-  /* Numbered section tag — e.g. "01  Summary" */
-  .section-tag {
-    @apply inline-flex items-center gap-3 rounded-full ring-1 ring-uf-blue/40 bg-white px-3 py-1 text-[12px] font-medium text-uf-blue;
-  }
-  .section-tag-num {
-    @apply font-mono text-uf-blue/80 text-[12px];
-  }
-
-  /* Card primitive — template rounded-2xl with hairline ring */
-  .tile {
-    @apply rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-card;
-  }
-  .tile-header {
-    @apply flex items-start justify-between border-b border-slate-100 px-5 py-4;
-  }
-  .tile-body {
-    @apply p-5;
-  }
-
-  /* KPI tile (template number-stat style) */
-  .kpi-tile {
-    @apply tile p-5 flex flex-col gap-2;
-  }
-  .kpi-num {
-    @apply font-display text-[38px] leading-[1] font-extrabold text-slate-900 tracking-tighter;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum", "ss01";
-  }
-  .kpi-num-accent {
-    @apply font-display text-[38px] leading-[1] font-extrabold text-uf-blue tracking-tighter;
+  .tabular {
     font-variant-numeric: tabular-nums;
   }
-  .kpi-label {
-    @apply font-mono text-[11px] uppercase tracking-[0.12em] text-slate-500;
+  .thin-scroll::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
   }
-  .kpi-hint {
-    @apply text-[12px] text-slate-500;
+  .thin-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-slate-300);
+    border-radius: 3px;
   }
-
-  /* Tab nav (template-like underline style, with mono numbers) */
-  .tab-nav {
-    @apply flex items-center gap-0;
-  }
-  .tab-link {
-    @apply flex items-center gap-3 px-5 py-4 text-[14px] font-medium text-slate-500 transition-colors border-b-2 border-transparent hover:text-slate-900;
-  }
-  .tab-link[data-active="true"] {
-    @apply text-slate-900 border-uf-blue;
-  }
-  .tab-link .tab-num {
-    @apply font-mono text-[12px] text-slate-400;
-  }
-  .tab-link[data-active="true"] .tab-num {
-    @apply text-uf-blue;
-  }
-
-  /* Gridded blue tile background — template hero motif */
-  .blue-grid-bg {
-    background-color: #0021A5;
-    background-image:
-      linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-    background-size: 48px 48px;
-  }
-
-  /* Subtle slate grid (used on page backgrounds) */
-  .slate-grid-bg {
-    background-color: #f8fafc;
-    background-image:
-      linear-gradient(to right, rgba(15, 23, 43, 0.04) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(15, 23, 43, 0.04) 1px, transparent 1px);
-    background-size: 64px 64px;
-  }
-
-  /* Dense table (template numbered-row pattern) */
-  .data-table {
-    @apply w-full text-[12.5px];
-  }
-  .data-table thead th {
-    @apply font-mono text-[11px] uppercase tracking-[0.08em] text-slate-500 font-medium text-left px-3 py-2.5 border-b border-slate-200;
-  }
-  .data-table tbody td {
-    @apply px-3 py-2.5 border-b border-slate-100;
-  }
-  .data-table tbody tr:hover td {
-    @apply bg-slate-50;
-  }
-  .data-table .num {
-    @apply font-mono tabular-nums;
-  }
-}
-
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-
-.thin-scroll::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
-}
-.thin-scroll::-webkit-scrollbar-thumb {
-  background: #cad5e2;
-  border-radius: 3px;
-}
-.thin-scroll::-webkit-scrollbar-track {
-  background: transparent;
 }

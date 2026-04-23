@@ -629,13 +629,11 @@ def load_encounters(path: Path) -> pd.DataFrame:
 
     df["reached_provider"] = df["MD Datetime"].notna() & ~df["is_lwbs"]
 
-    # Collapse multi-row encounters to one row per CSN. The master clinical_data
-    # export replicates identical rows for a subset of encounters, so `keep=first`
-    # is lossless. Doing this before the ICD-10 classification keeps both steps
-    # working on one-row-per-encounter data.
-    rows_before = len(df)
-    df = df.drop_duplicates(subset=["Encounter # (CSN)"], keep="first").reset_index(drop=True)
-    log.info("Loaded %d rows; %d distinct encounters after CSN dedup", rows_before, len(df))
+    # Every row in the master clinical_data export is treated as one encounter
+    # per product direction 2026-04-22. No CSN-based deduplication — downstream
+    # counts, rates, and medians operate directly on row-level data.
+    df = df.reset_index(drop=True)
+    log.info("Loaded %d encounters (row-level)", len(df))
 
     # Exhaustive multi-label ICD-10 classification (populates _cond_<slug>
     # booleans plus a back-compat primary-category string column).
@@ -1052,7 +1050,7 @@ def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
     monthly = (
         sub.groupby("year_month")
         .agg(
-            encounters=("Encounter # (CSN)", "count"),
+            encounters=("Encounter #" if "Encounter #" in sub.columns else "Encounter # (CSN)", "count"),
             admits=("is_admit", "sum"),
             lwbs=("is_lwbs", "sum"),
         )
@@ -1072,7 +1070,7 @@ def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
     recent = sub.sort_values("Arrival DateTime", ascending=False).head(50)
     patient_list = [
         {
-            "encounter": r["Encounter # (CSN)"],
+            "encounter": r.get("Encounter #", r.get("Encounter # (CSN)")),
             "mrn": r["MRN (UF)"],
             "location": r["ED Location"],
             "acuity": r["Acuity"],
@@ -1804,17 +1802,26 @@ def write_json(obj: Any, path: Path) -> None:
     clean = _sanitize(obj)
     data = json.dumps(clean, default=default, allow_nan=False, separators=(",", ":")).encode("utf-8")
     # Windows under heavy concurrent AV/indexing can return Errno 22 on
-    # write_text for brief sharing windows. Write bytes directly and retry on
-    # transient OSError to push through.
+    # rapid write_bytes calls against existing files. Write to a temp file
+    # first then atomically rename — Python's Path.replace uses MoveFileExW
+    # with replace-existing on Windows, which dodges the sharing-window race.
+    # Retry the whole operation generously on any transient OSError.
+    import time
+    tmp = path.with_suffix(path.suffix + ".tmp")
     last_err: OSError | None = None
-    for attempt in range(5):
+    for attempt in range(15):
         try:
-            path.write_bytes(data)
+            tmp.write_bytes(data)
+            tmp.replace(path)
             return
         except OSError as e:
             last_err = e
-            import time
-            time.sleep(0.05 * (attempt + 1))
+            time.sleep(0.1 * (attempt + 1))
+            try:
+                if tmp.exists():
+                    tmp.unlink()
+            except OSError:
+                pass
     raise last_err  # type: ignore[misc]
 
 
@@ -1898,10 +1905,14 @@ def main() -> int:
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    master_csv = args.data_dir / "clinical_data.csv"
+    # Prefer the latest versioned master feed when present.
+    master_csv = args.data_dir / "clinical_data_v2.csv"
     if not master_csv.exists():
-        log.error("Master CSV not found: %s", master_csv)
+        master_csv = args.data_dir / "clinical_data.csv"
+    if not master_csv.exists():
+        log.error("Master CSV not found in %s", args.data_dir)
         return 2
+    log.info("Using master CSV: %s", master_csv.name)
 
     df_all = load_encounters(master_csv)
     log.info("Master CSV loaded: %d distinct encounters", len(df_all))
