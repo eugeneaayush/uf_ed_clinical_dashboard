@@ -3,7 +3,7 @@ import { useMeta } from "../lib/data";
 import { fmtInt } from "../lib/format";
 import { SidebarLayout } from "./catalyst/sidebar-layout";
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarLabel, SidebarSection, SidebarSpacer } from "./catalyst/sidebar";
-import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from "./catalyst/navbar";
+import { Navbar, NavbarSection, NavbarSpacer } from "./catalyst/navbar";
 import { HomeIcon, ChartBarIcon, ClipboardDocumentListIcon, CalendarDaysIcon, ArrowPathRoundedSquareIcon } from "@heroicons/react/20/solid";
 import { Badge } from "./catalyst/badge";
 import { Text } from "./catalyst/text";
