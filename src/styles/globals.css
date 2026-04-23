@@ -88,4 +88,42 @@
     background: var(--color-slate-300);
     border-radius: 3px;
   }
+
+  /* Dense table */
+  .data-table {
+    width: 100%;
+    font-size: 12.5px;
+  }
+  .data-table thead th {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-zinc-500);
+    font-weight: 500;
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-zinc-200);
+  }
+  .data-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-zinc-100);
+  }
+  .data-table tbody tr:hover td {
+    background-color: var(--color-zinc-50);
+  }
+  .dark .data-table thead th {
+    color: var(--color-zinc-400);
+    border-bottom-color: var(--color-white-10);
+  }
+  .dark .data-table tbody td {
+    border-bottom-color: var(--color-white-5);
+  }
+  .dark .data-table tbody tr:hover td {
+    background-color: var(--color-zinc-800);
+  }
+  .data-table .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
 }

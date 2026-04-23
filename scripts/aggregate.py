@@ -59,12 +59,11 @@ LWBS_DISPOSITIONS = {"LWBS AFTER TRIAGE", "LWBS BEFORE TRIAGE"}
 LBTC_DISPOSITIONS = {"LEFT DURING TREATMENT"}
 AMA_DISPOSITIONS = {"AMA"}
 ADMIT_DISPOSITIONS = {"ADMIT"}
-# Per product spec: ADMIT + PRESENTED TO ADMIT SERVICE are the canonical admit
-# dispositions. PRESENTED TO ADMIT SERVICE is folded into ADMIT at load time so
-# downstream is_admit flags + counts treat both uniformly. TO PROCEDURE/
-# INTERVENTION and TO L&D are intentionally NOT folded.
+# Synonyms folded into "ADMIT" at load time (see load_encounters).
 ADMIT_DISPOSITION_ALIASES = {
     "PRESENTED TO ADMIT SERVICE",
+    "TO PROCEDURE/INTERVENTION",
+    "TO L&D",
 }
 TRANSFER_DISPOSITIONS = {
     "ED TRANSFER TO ADULT ED", "ED TRANSFER TO PEDS ED",
@@ -81,127 +80,6 @@ DATETIME_COLS = [
 ]
 
 TOP_N_CONDITIONS = 15
-
-# -----------------------------------------------------------------------------
-# ICD-10 condition-category classifier
-# -----------------------------------------------------------------------------
-# The clinical_data.csv master feed carries up to 5 ICD-10 codes per encounter
-# (Final ED Impression Dx1..5 Decimal — note the typo in Dx5's column name,
-# "Dispostion" not "Impression"; mirrored verbatim below). Each encounter is
-# classified EXHAUSTIVELY: it belongs to every category whose code-prefix
-# pattern matches ANY of its Dx codes. Categories are not mutually exclusive —
-# an encounter with sepsis + pneumonia counts in both Sepsis and Pneumonia.
-#
-# Category set is a CCS-inspired roll-up of ICD-10 chapters, chosen for ED
-# clinical relevance. Code prefixes are matched against the dot-stripped,
-# uppercased code ("I21.3" → "I213"); the match is a startswith, so listing
-# "I21" catches "I21.0" … "I21.9".
-DX_COLS = [
-    "Final ED Impression Dx1 Decimal",
-    "Final ED Impression Dx2 Decimal",
-    "Final ED Impression Dx3 Decimal",
-    "Final ED Impression Dx4 Decimal",
-    "Final ED Dispostion Dx5 Decimal",  # sic — typo in source column name
-]
-
-ICD10_CATEGORIES: list[tuple[str, list[str]]] = [
-    ("Sepsis", ["A40", "A41", "R652"]),
-    ("Cancer/Malignant Neoplasm", ["C"]),
-    ("Anemia", ["D50", "D51", "D52", "D53", "D55", "D56", "D57", "D58", "D59",
-                "D60", "D61", "D62", "D63", "D64"]),
-    ("Diabetes Mellitus", ["E08", "E09", "E10", "E11", "E13"]),
-    ("Hypoglycemia", ["E16"]),
-    ("Dehydration/Electrolyte Imbalance", ["E86", "E87"]),
-    ("Alcohol Use Disorder", ["F10"]),
-    ("Substance Use Disorder (non-alcohol)",
-     ["F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19"]),
-    ("Mood Disorders", ["F30", "F31", "F32", "F33", "F34", "F39"]),
-    ("Anxiety Disorders", ["F40", "F41", "F43"]),
-    ("Psychotic Disorders", ["F20", "F21", "F22", "F23", "F24", "F25", "F28", "F29"]),
-    ("Dementia/Cognitive", ["F00", "F01", "F02", "F03", "G30", "G31"]),
-    ("Epilepsy/Seizure", ["G40", "G41", "R56"]),
-    ("Migraine/Headache", ["G43", "G44", "R51"]),
-    ("AMI", ["I21", "I22"]),
-    ("Other Ischemic Heart Disease", ["I20", "I23", "I24", "I25"]),
-    ("Heart Failure", ["I50"]),
-    ("Atrial Fibrillation", ["I48"]),
-    ("Cardiac Arrhythmia (other)", ["I44", "I45", "I46", "I47", "I49"]),
-    ("Hypertension", ["I10", "I11", "I12", "I13", "I15", "I16"]),
-    ("Stroke/CVA", ["I60", "I61", "I62", "I63", "I64", "I65", "I66", "I67", "I69", "G45"]),
-    ("Pulmonary Embolism/DVT", ["I26", "I80", "I81", "I82"]),
-    ("Pneumonia", ["J12", "J13", "J14", "J15", "J16", "J17", "J18"]),
-    ("COPD", ["J40", "J41", "J42", "J43", "J44"]),
-    ("Asthma", ["J45", "J46"]),
-    ("Acute Bronchitis", ["J20", "J21", "J22"]),
-    ("Upper Respiratory Infection", ["J00", "J01", "J02", "J03", "J04", "J05", "J06"]),
-    ("Respiratory Failure", ["J96"]),
-    ("GI Hemorrhage", ["K920", "K921", "K922"]),
-    ("Appendicitis", ["K35", "K36", "K37", "K38"]),
-    ("Cholecystitis/Biliary Disease", ["K80", "K81", "K82", "K83"]),
-    ("Pancreatitis", ["K85", "K86"]),
-    ("Cellulitis/Skin Infection", ["L02", "L03"]),
-    ("Arthritis/Musculoskeletal Pain",
-     ["M05", "M06", "M10", "M13", "M15", "M16", "M17", "M18", "M19", "M54"]),
-    ("Fracture", ["S02", "S12", "S22", "S32", "S42", "S52", "S62", "S72", "S82", "S92"]),
-    ("Traumatic Brain Injury", ["S00", "S01", "S03", "S04", "S05", "S06", "S07", "S08", "S09"]),
-    ("Poisoning/Overdose",
-     ["T36", "T37", "T38", "T39", "T40", "T41", "T42", "T43", "T44",
-      "T45", "T46", "T47", "T48", "T49", "T50"]),
-    ("UTI", ["N10", "N30", "N390"]),
-    ("Acute Kidney Injury", ["N17"]),
-    ("Chronic Kidney Disease", ["N18"]),
-    ("Renal Stones", ["N20", "N21", "N22", "N23"]),
-    ("Pregnancy/Childbirth", ["O"]),
-    ("Chest Pain (unspecified)", ["R07"]),
-    ("Abdominal Pain", ["R10"]),
-    ("Syncope", ["R55"]),
-    ("Altered Mental Status", ["R40", "R41"]),
-    ("Fever", ["R50"]),
-]
-
-
-def _cond_col(category_name: str) -> str:
-    """Column name holding the boolean membership flag for a condition."""
-    return f"_cond_{slugify(category_name)}"
-
-
-def classify_icd10(df: pd.DataFrame) -> pd.DataFrame:
-    """Add per-category boolean columns (_cond_<slug>) plus a back-compat
-    `ICD-10 Condition Category` column holding the list of matching categories.
-    Every downstream filter that used `df["ICD-10 Condition Category"] == cat`
-    is replaced with `df[_cond_col(cat)]`."""
-    # Normalize each Dx column: strip dots + whitespace, uppercase.
-    norm = {}
-    for c in DX_COLS:
-        if c in df.columns:
-            norm[c] = (
-                df[c].astype(str)
-                .str.replace(".", "", regex=False)
-                .str.strip()
-                .str.upper()
-            )
-        else:
-            norm[c] = pd.Series("", index=df.index)
-
-    # One boolean column per category.
-    for cat_name, prefixes in ICD10_CATEGORIES:
-        prefixes_norm = tuple(p.replace(".", "").upper() for p in prefixes)
-        mask = pd.Series(False, index=df.index)
-        for c in DX_COLS:
-            mask |= norm[c].str.startswith(prefixes_norm, na=False)
-        df[_cond_col(cat_name)] = mask
-
-    # Back-compat: keep an `ICD-10 Condition Category` column whose value is
-    # the first matching category (used by the old patient-list display).
-    # When nothing matches, fall back to "Other/Uncategorized".
-    def first_cat(row: pd.Series) -> str:
-        for cat_name, _ in ICD10_CATEGORIES:
-            if row[_cond_col(cat_name)]:
-                return cat_name
-        return "Other/Uncategorized"
-
-    df["ICD-10 Condition Category"] = df.apply(first_cat, axis=1)
-    return df
 ALWAYS_INCLUDE_CONDITIONS = ["AMI", "Heart Failure", "Pneumonia"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -537,25 +415,20 @@ def load_encounters(path: Path) -> pd.DataFrame:
     log.info("Loading encounters from %s", path)
     df = pd.read_csv(path, dtype=str, keep_default_na=False, na_values=[""])
     df.columns = [c.strip() for c in df.columns]
-    # clinical_data.csv uses YYYY/MM/DD HH:MM:SS; older per-FY exports used
-    # MM/DD/YYYY HH:MM. `format="mixed"` parses both; errors=coerce leaves
-    # unparseable values as NaT so downstream .dt calls still work.
     for col in DATETIME_COLS:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce", format="mixed")
+            df[col] = pd.to_datetime(df[col], errors="coerce", format="%m/%d/%Y %H:%M")
 
     df["ED Location"] = df["ED Location"].fillna("Unknown").str.strip()
     df["Acuity"] = df["Acuity"].fillna("Unknown").str.strip().replace("?", "Unknown")
     df["Final ED Disposition"] = df["Final ED Disposition"].fillna("Unknown").str.strip()
     df.loc[df["Final ED Disposition"].isin(ADMIT_DISPOSITION_ALIASES), "Final ED Disposition"] = "ADMIT"
+    df["ICD-10 Condition Category"] = df["ICD-10 Condition Category"].fillna("Other/Uncategorized").str.strip()
     df["Arrival Mode Type"] = df["Arrival Mode Type"].fillna("Unknown").str.strip()
+    df["Action Financial Class"] = df["Action Financial Class"].fillna("Unknown").str.strip()
     df["Attending MD"] = df["Attending MD"].fillna("Unassigned").str.strip()
     df["LWBS Flag"] = df["LWBS Flag"].fillna("N").str.strip().str.upper()
-    # Optional columns that some feeds may omit — guard before touching.
-    if "Action Financial Class" in df.columns:
-        df["Action Financial Class"] = df["Action Financial Class"].fillna("Unknown").str.strip()
-    if "Work RVU" in df.columns:
-        df["Work RVU"] = pd.to_numeric(df["Work RVU"], errors="coerce").fillna(0.0)
+    df["Work RVU"] = pd.to_numeric(df["Work RVU"], errors="coerce").fillna(0.0)
 
     df = df[df["ED Location"].isin(ED_LOCATIONS)].copy()
 
@@ -629,15 +502,7 @@ def load_encounters(path: Path) -> pd.DataFrame:
 
     df["reached_provider"] = df["MD Datetime"].notna() & ~df["is_lwbs"]
 
-    # Every row in the master clinical_data export is treated as one encounter
-    # per product direction 2026-04-22. No CSN-based deduplication — downstream
-    # counts, rates, and medians operate directly on row-level data.
-    df = df.reset_index(drop=True)
-    log.info("Loaded %d encounters (row-level)", len(df))
-
-    # Exhaustive multi-label ICD-10 classification (populates _cond_<slug>
-    # booleans plus a back-compat primary-category string column).
-    df = classify_icd10(df)
+    log.info("Loaded %d encounters", len(df))
     return df
 
 
@@ -802,7 +667,7 @@ def build_metric_payload(
         # Use the top-N + always-include list
         top_cats = _top_conditions(full_df)
         for cat in top_cats:
-            cat_df = df_slice[df_slice[_cond_col(cat)]] if _cond_col(cat) in df_slice.columns else df_slice.iloc[0:0]
+            cat_df = df_slice[df_slice["ICD-10 Condition Category"] == cat]
             by_condition.append({
                 "condition": cat,
                 "slug": slugify(cat),
@@ -851,29 +716,15 @@ def build_metric_payload(
 # Condition & meta helpers
 # ---------------------------------------------------------------------------
 
-def _category_counts(df: pd.DataFrame) -> dict[str, int]:
-    """Encounter count per condition category (multi-label). An encounter can
-    contribute to multiple categories, so the sum exceeds len(df)."""
-    counts = {}
-    for name, _ in ICD10_CATEGORIES:
-        col = _cond_col(name)
-        counts[name] = int(df[col].sum()) if col in df.columns else 0
-    return counts
-
-
 def _top_conditions(df: pd.DataFrame) -> list[str]:
-    """Return every CCS-style category present in the data, ordered by
-    encounter count descending. Empty categories are dropped so the frontend's
-    Conditions index doesn't show a graveyard of 0-count rows."""
-    counts = _category_counts(df)
-    ordered = sorted(
-        (name for name, n in counts.items() if n > 0),
-        key=lambda c: -counts[c],
-    )
+    cond_vc = df[df["ICD-10 Condition Category"] != "Other/Uncategorized"][
+        "ICD-10 Condition Category"
+    ].value_counts()
+    top = cond_vc.head(TOP_N_CONDITIONS).index.tolist()
     for forced in ALWAYS_INCLUDE_CONDITIONS:
-        if forced in counts and forced not in ordered:
-            ordered.append(forced)
-    return ordered
+        if forced in cond_vc.index and forced not in top:
+            top.append(forced)
+    return sorted(top, key=lambda c: -int(cond_vc.get(c, 0)))
 
 
 # ---------------------------------------------------------------------------
@@ -910,24 +761,25 @@ def build_summary_payload(df: pd.DataFrame, top_conditions: list[str]) -> dict[s
     ]
 
     # Admissions by Diagnosis — ADMIT-dispo share by ICD-10 condition category.
-    # Multi-label: a single admitted encounter can contribute to several
-    # categories (e.g. sepsis + pneumonia). Top 6 by CSN-distinct encounter count.
+    # Replaces the old "Patients by Admission Type" bar chart. We keep this as
+    # a sibling to "Discharges by Diagnosis" so leaders can see whether the
+    # diagnoses flowing into inpatient service match those that discharge home.
     adm_df = df[df["is_admit"]]
-    adm_counts = _category_counts(adm_df)
+    adm_by_dx = (
+        adm_df[adm_df["ICD-10 Condition Category"] != "Other/Uncategorized"]
+        ["ICD-10 Condition Category"].value_counts().head(6)
+    )
     admissions_by_diagnosis = [
-        {"label": name, "value": count}
-        for name, count in sorted(adm_counts.items(), key=lambda kv: -kv[1])[:6]
-        if count > 0
+        {"label": k, "value": int(v)} for k, v in adm_by_dx.items()
     ]
 
     # Discharges by Diagnosis (top ICD categories for discharged patients)
     dis_df = df[df["is_discharge"]]
-    disc_counts = _category_counts(dis_df)
-    discharges_by_diagnosis = [
-        {"label": name, "value": count}
-        for name, count in sorted(disc_counts.items(), key=lambda kv: -kv[1])[:6]
-        if count > 0
-    ]
+    disc_by_dx = (
+        dis_df[dis_df["ICD-10 Condition Category"] != "Other/Uncategorized"]
+        ["ICD-10 Condition Category"].value_counts().head(6)
+    )
+    discharges_by_diagnosis = [{"label": k, "value": int(v)} for k, v in disc_by_dx.items()]
 
     # Average Acuity by ED Location (donut) — replaces the Encounters-by-Location donut.
     # Lower ESI = sicker. We show mean(ESI) per site alongside the encounter
@@ -942,21 +794,21 @@ def build_summary_payload(df: pd.DataFrame, top_conditions: list[str]) -> dict[s
             "encounters": int(len(loc_df)),  # for tooltip / legend context
         })
 
-    # % of Encounters by Diagnosis (top 6 categories, multi-label)
-    all_counts = _category_counts(df)
-    top6 = sorted(all_counts.items(), key=lambda kv: -kv[1])[:6]
-    dx_total = sum(count for _, count in top6) or 1
+    # % of Encounters by Diagnosis
+    dx_vc = df[df["ICD-10 Condition Category"] != "Other/Uncategorized"][
+        "ICD-10 Condition Category"
+    ].value_counts().head(6)
+    dx_total = int(dx_vc.sum())
     pct_by_diagnosis = [
-        {"label": name, "value": count, "pct": safe_pct(count, dx_total, 2)}
-        for name, count in top6 if count > 0
+        {"label": k, "value": int(v), "pct": safe_pct(int(v), dx_total, 2)}
+        for k, v in dx_vc.items()
     ]
 
     # Top 10 Diagnoses
-    top10 = sorted(all_counts.items(), key=lambda kv: -kv[1])[:10]
-    top_10_diagnoses = [
-        {"label": name, "value": count}
-        for name, count in top10 if count > 0
-    ]
+    top10_vc = df[df["ICD-10 Condition Category"] != "Other/Uncategorized"][
+        "ICD-10 Condition Category"
+    ].value_counts().head(10)
+    top_10_diagnoses = [{"label": k, "value": int(v)} for k, v in top10_vc.items()]
 
     # Arrival Mode by Year (retained)
     years = sorted(df["year_month"].dropna().str[:4].unique())
@@ -995,8 +847,7 @@ def build_summary_payload(df: pd.DataFrame, top_conditions: list[str]) -> dict[s
 # ---------------------------------------------------------------------------
 
 def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
-    col = _cond_col(category)
-    sub = df[df[col]].copy() if col in df.columns else df.iloc[0:0].copy()
+    sub = df[df["ICD-10 Condition Category"] == category].copy()
     n = len(sub)
     if n == 0:
         return {"category": category, "slug": slugify(category), "encounters": 0}
@@ -1050,7 +901,7 @@ def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
     monthly = (
         sub.groupby("year_month")
         .agg(
-            encounters=("Encounter #" if "Encounter #" in sub.columns else "Encounter # (CSN)", "count"),
+            encounters=("Encounter #", "count"),
             admits=("is_admit", "sum"),
             lwbs=("is_lwbs", "sum"),
         )
@@ -1070,7 +921,7 @@ def build_condition_payload(df: pd.DataFrame, category: str) -> dict[str, Any]:
     recent = sub.sort_values("Arrival DateTime", ascending=False).head(50)
     patient_list = [
         {
-            "encounter": r.get("Encounter #", r.get("Encounter # (CSN)")),
+            "encounter": r["Encounter #"],
             "mrn": r["MRN (UF)"],
             "location": r["ED Location"],
             "acuity": r["Acuity"],
@@ -1397,14 +1248,7 @@ def _hourly_activity_singleday(df: pd.DataFrame, target_date: pd.Timestamp) -> l
     arr = active["Arrival DateTime"]
     exit_ts = active["Exit Datetime"].fillna(active["Disposition Datetime"]).fillna(arr)
     inroom = active["Inroom Datetime"]
-    # "Admit Disposition Datetime" is present in older per-FY exports but not
-    # in the clinical_data.csv master feed. Fall back to Disposition Datetime
-    # when the column is absent so the hourly activity chart still renders.
-    admit_dispo_ts = (
-        active["Admit Disposition Datetime"].fillna(active["Disposition Datetime"])
-        if "Admit Disposition Datetime" in active.columns
-        else active["Disposition Datetime"]
-    )
+    admit_dispo_ts = active["Admit Disposition Datetime"].fillna(active["Disposition Datetime"])
     bed_ready_ts = active["Bed Ready Datetime"]
 
     for h in range(24):
@@ -1800,29 +1644,7 @@ def write_json(obj: Any, path: Path) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     clean = _sanitize(obj)
-    data = json.dumps(clean, default=default, allow_nan=False, separators=(",", ":")).encode("utf-8")
-    # Windows under heavy concurrent AV/indexing can return Errno 22 on
-    # rapid write_bytes calls against existing files. Write to a temp file
-    # first then atomically rename — Python's Path.replace uses MoveFileExW
-    # with replace-existing on Windows, which dodges the sharing-window race.
-    # Retry the whole operation generously on any transient OSError.
-    import time
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    last_err: OSError | None = None
-    for attempt in range(15):
-        try:
-            tmp.write_bytes(data)
-            tmp.replace(path)
-            return
-        except OSError as e:
-            last_err = e
-            time.sleep(0.1 * (attempt + 1))
-            try:
-                if tmp.exists():
-                    tmp.unlink()
-            except OSError:
-                pass
-    raise last_err  # type: ignore[misc]
+    path.write_text(json.dumps(clean, default=default, allow_nan=False, separators=(",", ":")))
 
 
 # ---------------------------------------------------------------------------
@@ -1865,7 +1687,7 @@ def emit_fy_payloads(
                 metric_dir / f"{slugify(loc)}.json",
             )
         for cat in top_conditions:
-            sub = fy_df[fy_df[_cond_col(cat)]] if _cond_col(cat) in fy_df.columns else fy_df.iloc[0:0]
+            sub = fy_df[fy_df["ICD-10 Condition Category"] == cat]
             write_json(
                 build_metric_payload(sub, df_all, m, cat, "condition"),
                 metric_dir / f"cond-{slugify(cat)}.json",
@@ -1898,24 +1720,26 @@ def mirror_latest_to_top_level(src: Path, dst: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("data_raw"),
-                        help="Directory containing clinical_data.csv.")
+                        help="Directory containing BO_data_pull*.csv files.")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    # Prefer the latest versioned master feed when present.
-    master_csv = args.data_dir / "clinical_data_v2.csv"
-    if not master_csv.exists():
-        master_csv = args.data_dir / "clinical_data.csv"
-    if not master_csv.exists():
-        log.error("Master CSV not found in %s", args.data_dir)
+    csv_files = sorted(args.data_dir.glob("BO_data_pull*.csv"))
+    if not csv_files:
+        log.error("No BO_data_pull*.csv files found in %s", args.data_dir)
         return 2
-    log.info("Using master CSV: %s", master_csv.name)
 
-    df_all = load_encounters(master_csv)
-    log.info("Master CSV loaded: %d distinct encounters", len(df_all))
+    log.info("Loading %d clinical CSV(s) from %s", len(csv_files), args.data_dir)
+    parts = []
+    for p in csv_files:
+        part = load_encounters(p)
+        log.info("  %s: %d encounters", p.name, len(part))
+        parts.append(part)
+    df_all = pd.concat(parts, ignore_index=True)
+    log.info("Concatenated: %d total encounters", len(df_all))
 
     df_all = compute_return_visits(df_all)
     top_conditions = _top_conditions(df_all)
