@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/*
+ * Force light mode app-wide.
+ *
+ * Tailwind v4's `dark:` variant defaults to @media(prefers-color-scheme: dark),
+ * which means users on dark-mode OSes see every Catalyst `dark:*` utility fire
+ * regardless of our explicit light-palette work in pages/components. Re-bind
+ * the dark variant to trigger only when a literal `.dark` class is present on
+ * an ancestor — we never set that class, so all `dark:` utilities become
+ * no-ops and the light theme always wins.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Hard-lock the color-scheme so browser-painted UI (scrollbars, form
+ * controls, autofill) also ignores the OS dark preference. */
+:root { color-scheme: light; }
+
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Anybody", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
@@ -46,12 +62,9 @@
     font-variant-numeric: tabular-nums;
   }
 
-  @variant dark {
-    body {
-      background-color: var(--color-zinc-950);
-      color: var(--color-zinc-50);
-    }
-  }
+  /* The dark-body override is intentionally removed — the custom `dark`
+   * variant at the top of this file makes it a no-op anyway, but leaving it
+   * out keeps the intent obvious. */
 
   h1, h2, h3, h4 {
     font-family: var(--font-display);
