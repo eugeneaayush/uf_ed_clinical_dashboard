@@ -17,7 +17,7 @@ import { Card } from "../components/Card";
 import { ChartTooltip } from "../components/ChartTooltip";
 import { LoadingDots, ErrorState, PageHeader } from "../components/States";
 import { useSummary, useMeta } from "../lib/data";
-import type { SummaryKpi } from "../lib/types";
+import type { SummaryKpi, SummaryDemographics, DemographicsBucket } from "../lib/types";
 import { fmtInt, fmtDec, truncate } from "../lib/format";
 import {
   LOCATION_COLOR,
@@ -74,6 +74,9 @@ export function Summary() {
 
       {/* KPI header row — mirrors Oracle's top bar */}
       <KpiHeaderRow kpis={data.kpis} />
+
+      {/* Demographics row — Patient Mix · Sex · Age (only when payload includes it) */}
+      {data.demographics && <DemographicsRow demographics={data.demographics} />}
 
       {/* Row 1: Admissions by Diagnosis + Discharges by Diagnosis — sibling bars */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -466,6 +469,110 @@ function acuityTint(v: number | null | undefined): string | undefined {
 }
 
 /* ---------- Helpers ---------- */
+
+/* ---------- Demographics row ---------- */
+
+const DEMO_PALETTE_SEX = ["#0021A5", "#FA4616"]; // UF blue + UF orange
+const DEMO_PALETTE_SEGMENT = ["#0021A5", "#67e8f9"]; // UF blue + cyan-300
+
+function DemographicsRow({ demographics }: { demographics: SummaryDemographics }) {
+  const { age_mean, age_median, by_sex, by_segment } = demographics;
+  const hasSegment = by_segment.length > 0 && by_segment.some((b) => b.value > 0);
+  const hasSex = by_sex.length > 0 && by_sex.some((b) => b.value > 0);
+  const hasAge = age_mean != null || age_median != null;
+  if (!hasSegment && !hasSex && !hasAge) return null;
+
+  return (
+    <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      {hasSegment && (
+        <Card num="02a" title="Patient Mix" sub="Adult vs Pediatric encounters">
+          <DemographicsDonut data={by_segment} palette={DEMO_PALETTE_SEGMENT} />
+        </Card>
+      )}
+      {hasSex && (
+        <Card num="02b" title="Sex Distribution" sub="Female / Male split">
+          <DemographicsDonut data={by_sex} palette={DEMO_PALETTE_SEX} />
+        </Card>
+      )}
+      {hasAge && (
+        <Card num="02c" title="Age" sub="Patient age across all encounters">
+          <div className="flex h-[200px] items-center justify-around">
+            <AgeStat label="Mean" value={age_mean} />
+            <div className="h-16 w-px bg-zinc-200" aria-hidden />
+            <AgeStat label="Median" value={age_median} />
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function DemographicsDonut({ data, palette }: { data: DemographicsBucket[]; palette: string[] }) {
+  return (
+    <div className="flex flex-col md:flex-row items-center gap-4">
+      <div className="w-full md:w-1/2 h-[200px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="label"
+              innerRadius={48}
+              outerRadius={78}
+              paddingAngle={1.5}
+              stroke="none"
+            >
+              {data.map((d, i) => (
+                <Cell key={d.label} fill={palette[i % palette.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              content={
+                <ChartTooltip
+                  valueFormatter={(v) => (typeof v === "number" ? fmtInt(v) : String(v))}
+                />
+              }
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="w-full md:w-1/2 space-y-1">
+        {data.map((d, i) => (
+          <li
+            key={d.label}
+            className="flex items-center justify-between py-1.5 border-b border-zinc-100 last:border-0"
+          >
+            <span className="flex items-center gap-2 text-[12px]">
+              <span
+                className="h-2.5 w-2.5 rounded-sm"
+                style={{ backgroundColor: palette[i % palette.length] }}
+              />
+              <span className="font-medium text-zinc-900">{d.label}</span>
+            </span>
+            <span className="font-mono text-[11.5px] flex gap-3">
+              <span className="font-semibold text-zinc-900">{fmtInt(d.value)}</span>
+              <span className="text-zinc-500 w-12 text-right">{d.pct.toFixed(1)}%</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function AgeStat({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="text-center">
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-zinc-500 mb-1">
+        {label}
+      </div>
+      <div className="font-display text-[40px] font-extrabold leading-none tracking-tighter tabular text-uf-blue">
+        {value != null ? fmtDec(value, 1) : "—"}
+      </div>
+      <div className="font-mono text-[11px] text-zinc-500 mt-1">years</div>
+    </div>
+  );
+}
 
 function yearColumns(rows: Array<Record<string, string | number>>): string[] {
   if (!rows.length) return [];

@@ -82,6 +82,135 @@ DATETIME_COLS = [
 TOP_N_CONDITIONS = 15
 ALWAYS_INCLUDE_CONDITIONS = ["AMI", "Heart Failure", "Pneumonia"]
 
+# Map dashboard_data.csv column names back to the canonical names the rest of
+# the aggregator was authored against. Applied immediately after read_csv so
+# every downstream reference to e.g. `df["Encounter #"]` keeps working without
+# threading new names through 1700 lines of code.
+COLUMN_RENAMES: dict[str, str] = {
+    "Encounter": "Encounter #",
+    "CSN": "Encounter # (CSN)",
+    "MRN": "MRN (UF)",
+    "ED location": "ED Location",   # lowercase 'l' in new feed
+    "acuity": "Acuity",             # lowercase in new feed
+    "Arrival Mode": "Arrival Mode Type",
+}
+
+# 5 ICD-10 decimal-code columns carried by the new feed. Note the source
+# typo on Dx5 ("Dispostion" not "Impression"); mirrored verbatim.
+DX_COLS = [
+    "Final ED Impression Dx1 Decimal",
+    "Final ED Impression Dx2 Decimal",
+    "Final ED Impression Dx3 Decimal",
+    "Final ED Impression Dx4 Decimal",
+    "Final ED Dispostion Dx5 Decimal",
+]
+
+# CCS-inspired ICD-10 condition categories. Each entry is (display name,
+# list of code prefixes). Codes are matched against the dot-stripped,
+# uppercased Dx values; a prefix of "I21" matches "I21.0", "I21.3", etc.
+# Multi-label: an encounter belongs to every category whose prefix matches
+# any of its 5 Dx codes.
+ICD10_CATEGORIES: list[tuple[str, list[str]]] = [
+    ("Sepsis", ["A40", "A41", "R652"]),
+    ("Cancer/Malignant Neoplasm", ["C"]),
+    ("Anemia", ["D50", "D51", "D52", "D53", "D55", "D56", "D57", "D58", "D59",
+                "D60", "D61", "D62", "D63", "D64"]),
+    ("Diabetes Mellitus", ["E08", "E09", "E10", "E11", "E13"]),
+    ("Hypoglycemia", ["E16"]),
+    ("Dehydration/Electrolyte Imbalance", ["E86", "E87"]),
+    ("Alcohol Use Disorder", ["F10"]),
+    ("Substance Use Disorder (non-alcohol)",
+     ["F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19"]),
+    ("Mood Disorders", ["F30", "F31", "F32", "F33", "F34", "F39"]),
+    ("Anxiety Disorders", ["F40", "F41", "F43"]),
+    ("Psychotic Disorders", ["F20", "F21", "F22", "F23", "F24", "F25", "F28", "F29"]),
+    ("Dementia/Cognitive", ["F00", "F01", "F02", "F03", "G30", "G31"]),
+    ("Epilepsy/Seizure", ["G40", "G41", "R56"]),
+    ("Migraine/Headache", ["G43", "G44", "R51"]),
+    ("AMI", ["I21", "I22"]),
+    ("Other Ischemic Heart Disease", ["I20", "I23", "I24", "I25"]),
+    ("Heart Failure", ["I50"]),
+    ("Atrial Fibrillation", ["I48"]),
+    ("Cardiac Arrhythmia (other)", ["I44", "I45", "I46", "I47", "I49"]),
+    ("Hypertension", ["I10", "I11", "I12", "I13", "I15", "I16"]),
+    ("Stroke/CVA", ["I60", "I61", "I62", "I63", "I64", "I65", "I66", "I67", "I69", "G45"]),
+    ("Pulmonary Embolism/DVT", ["I26", "I80", "I81", "I82"]),
+    ("Pneumonia", ["J12", "J13", "J14", "J15", "J16", "J17", "J18"]),
+    ("COPD", ["J40", "J41", "J42", "J43", "J44"]),
+    ("Asthma", ["J45", "J46"]),
+    ("Acute Bronchitis", ["J20", "J21", "J22"]),
+    ("Upper Respiratory Infection", ["J00", "J01", "J02", "J03", "J04", "J05", "J06"]),
+    ("Respiratory Failure", ["J96"]),
+    ("GI Hemorrhage", ["K920", "K921", "K922"]),
+    ("Appendicitis", ["K35", "K36", "K37", "K38"]),
+    ("Cholecystitis/Biliary Disease", ["K80", "K81", "K82", "K83"]),
+    ("Pancreatitis", ["K85", "K86"]),
+    ("Cellulitis/Skin Infection", ["L02", "L03"]),
+    ("Arthritis/Musculoskeletal Pain",
+     ["M05", "M06", "M10", "M13", "M15", "M16", "M17", "M18", "M19", "M54"]),
+    ("Fracture", ["S02", "S12", "S22", "S32", "S42", "S52", "S62", "S72", "S82", "S92"]),
+    ("Traumatic Brain Injury", ["S00", "S01", "S03", "S04", "S05", "S06", "S07", "S08", "S09"]),
+    ("Poisoning/Overdose",
+     ["T36", "T37", "T38", "T39", "T40", "T41", "T42", "T43", "T44",
+      "T45", "T46", "T47", "T48", "T49", "T50"]),
+    ("UTI", ["N10", "N30", "N390"]),
+    ("Acute Kidney Injury", ["N17"]),
+    ("Chronic Kidney Disease", ["N18"]),
+    ("Renal Stones", ["N20", "N21", "N22", "N23"]),
+    ("Pregnancy/Childbirth", ["O"]),
+    ("Chest Pain (unspecified)", ["R07"]),
+    ("Abdominal Pain", ["R10"]),
+    ("Syncope", ["R55"]),
+    ("Altered Mental Status", ["R40", "R41"]),
+    ("Fever", ["R50"]),
+]
+
+
+def _cond_col(category_name: str) -> str:
+    """Boolean membership-flag column name for a condition."""
+    return f"_cond_{slugify(category_name)}"
+
+
+def classify_icd10(df: pd.DataFrame) -> pd.DataFrame:
+    """Add per-category boolean columns (_cond_<slug>) and a back-compat
+    `ICD-10 Condition Category` string carrying the first matching category.
+    Multi-label: one encounter can belong to several categories simultaneously.
+    Each row is matched against every prefix in ICD10_CATEGORIES — if any of
+    the 5 Dx codes starts with any prefix, the row is flagged for that category.
+    """
+    norm: dict[str, pd.Series] = {}
+    for c in DX_COLS:
+        if c in df.columns:
+            norm[c] = (
+                df[c].astype(str)
+                .str.replace(".", "", regex=False)
+                .str.strip()
+                .str.upper()
+            )
+        else:
+            norm[c] = pd.Series("", index=df.index)
+
+    for cat_name, prefixes in ICD10_CATEGORIES:
+        prefixes_norm = tuple(p.replace(".", "").upper() for p in prefixes)
+        mask = pd.Series(False, index=df.index)
+        for c in DX_COLS:
+            mask |= norm[c].str.startswith(prefixes_norm, na=False)
+        df[_cond_col(cat_name)] = mask
+
+    # Back-compat string column — picked up by compute_return_visits' same-Dx
+    # detection. First matching category wins; falls back to "Other/Uncategorized".
+    cat_cols = [_cond_col(name) for name, _ in ICD10_CATEGORIES]
+    cat_names = [name for name, _ in ICD10_CATEGORIES]
+    primary = pd.Series("Other/Uncategorized", index=df.index)
+    if cat_cols:
+        bool_block = df[cat_cols].to_numpy()
+        # Argmax returns 0 when no match; combine with any() to detect truly-empty rows.
+        any_match = bool_block.any(axis=1)
+        first_idx = bool_block.argmax(axis=1)
+        primary.iloc[any_match] = [cat_names[i] for i in first_idx[any_match]]
+    df["ICD-10 Condition Category"] = primary
+    return df
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger("aggregate")
 
@@ -415,20 +544,26 @@ def load_encounters(path: Path) -> pd.DataFrame:
     log.info("Loading encounters from %s", path)
     df = pd.read_csv(path, dtype=str, keep_default_na=False, na_values=[""])
     df.columns = [c.strip() for c in df.columns]
+    # Map dashboard_data.csv column names to the canonical names the rest of
+    # the aggregator expects. Pandas silently ignores keys whose old name isn't
+    # present, so the rename works on both old (already-canonical) and new feeds.
+    df = df.rename(columns=COLUMN_RENAMES)
     for col in DATETIME_COLS:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce", format="%m/%d/%Y %H:%M")
+            df[col] = pd.to_datetime(df[col], errors="coerce", format="mixed")
 
     df["ED Location"] = df["ED Location"].fillna("Unknown").str.strip()
     df["Acuity"] = df["Acuity"].fillna("Unknown").str.strip().replace("?", "Unknown")
     df["Final ED Disposition"] = df["Final ED Disposition"].fillna("Unknown").str.strip()
     df.loc[df["Final ED Disposition"].isin(ADMIT_DISPOSITION_ALIASES), "Final ED Disposition"] = "ADMIT"
-    df["ICD-10 Condition Category"] = df["ICD-10 Condition Category"].fillna("Other/Uncategorized").str.strip()
     df["Arrival Mode Type"] = df["Arrival Mode Type"].fillna("Unknown").str.strip()
-    df["Action Financial Class"] = df["Action Financial Class"].fillna("Unknown").str.strip()
     df["Attending MD"] = df["Attending MD"].fillna("Unassigned").str.strip()
     df["LWBS Flag"] = df["LWBS Flag"].fillna("N").str.strip().str.upper()
-    df["Work RVU"] = pd.to_numeric(df["Work RVU"], errors="coerce").fillna(0.0)
+    # Optional columns no longer in dashboard_data.csv — guard before touching.
+    if "Action Financial Class" in df.columns:
+        df["Action Financial Class"] = df["Action Financial Class"].fillna("Unknown").str.strip()
+    if "Work RVU" in df.columns:
+        df["Work RVU"] = pd.to_numeric(df["Work RVU"], errors="coerce").fillna(0.0)
 
     df = df[df["ED Location"].isin(ED_LOCATIONS)].copy()
 
@@ -502,7 +637,32 @@ def load_encounters(path: Path) -> pd.DataFrame:
 
     df["reached_provider"] = df["MD Datetime"].notna() & ~df["is_lwbs"]
 
-    log.info("Loaded %d encounters", len(df))
+    # ---- Demographics --------------------------------------------------------
+    if "sex" in df.columns:
+        df["sex_norm"] = df["sex"].fillna("Unknown").str.strip().str.upper()
+    else:
+        df["sex_norm"] = "Unknown"
+    if "age" in df.columns:
+        age_num = pd.to_numeric(df["age"], errors="coerce")
+        df["age_numeric"] = age_num.where((age_num >= 0) & (age_num <= 130))
+    else:
+        df["age_numeric"] = pd.NA
+    seg = (
+        df["ped/adult"].astype(str).str.strip().str.upper()
+        if "ped/adult" in df.columns
+        else pd.Series("", index=df.index)
+    )
+    df["is_pediatric"] = seg == "P"
+    df["is_adult"] = seg == "A"
+
+    # ---- Dedup + ICD-10 classification --------------------------------------
+    rows_before = len(df)
+    df = df.drop_duplicates(subset=["Encounter #"], keep="first").reset_index(drop=True)
+    df = classify_icd10(df)
+    log.info(
+        "Loaded %d rows; %d distinct encounters after Encounter dedup",
+        rows_before, len(df),
+    )
     return df
 
 
@@ -830,6 +990,44 @@ def build_summary_payload(df: pd.DataFrame, top_conditions: list[str]) -> dict[s
         acuity_monthly.append(rec)
     acuity_monthly = sorted(acuity_monthly, key=lambda r: r["year_month"])
 
+    # Demographics — surfaced as 3 cards on the Summary page.
+    # Sex split: counts per normalized sex value (drop "UNKNOWN" sentinel).
+    by_sex: list[dict[str, Any]] = []
+    if "sex_norm" in df.columns:
+        sex_counts = df.loc[df["sex_norm"].isin(["MALE", "FEMALE"]), "sex_norm"].value_counts()
+        sex_total = int(sex_counts.sum())
+        for label in ["FEMALE", "MALE"]:
+            count = int(sex_counts.get(label, 0))
+            by_sex.append({
+                "label": label.title(),
+                "value": count,
+                "pct": safe_pct(count, sex_total, 1) if sex_total else 0.0,
+            })
+    # Adult vs Pediatric — derived from `ped/adult` column.
+    by_segment: list[dict[str, Any]] = []
+    if "is_pediatric" in df.columns and "is_adult" in df.columns:
+        ad = int(df["is_adult"].sum())
+        pd_ct = int(df["is_pediatric"].sum())
+        seg_total = ad + pd_ct
+        if seg_total > 0:
+            by_segment = [
+                {"label": "Adult", "value": ad, "pct": safe_pct(ad, seg_total, 1)},
+                {"label": "Pediatric", "value": pd_ct, "pct": safe_pct(pd_ct, seg_total, 1)},
+            ]
+    # Age stats.
+    age_mean = age_median = None
+    if "age_numeric" in df.columns:
+        age_series = df["age_numeric"].dropna()
+        if len(age_series) > 0:
+            age_mean = round(float(age_series.mean()), 1)
+            age_median = round(float(age_series.median()), 1)
+    demographics = {
+        "age_mean": age_mean,
+        "age_median": age_median,
+        "by_sex": by_sex,
+        "by_segment": by_segment,
+    }
+
     return {
         "kpis": kpis,
         "admissions_by_diagnosis": admissions_by_diagnosis,
@@ -839,6 +1037,7 @@ def build_summary_payload(df: pd.DataFrame, top_conditions: list[str]) -> dict[s
         "top_10_diagnoses": top_10_diagnoses,
         "arrival_by_year": arrival_by_year,
         "acuity_monthly": acuity_monthly,
+        "demographics": demographics,
     }
 
 
@@ -1720,26 +1919,36 @@ def mirror_latest_to_top_level(src: Path, dst: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, default=Path("data_raw"),
-                        help="Directory containing BO_data_pull*.csv files.")
+                        help="Directory holding the master clinical feed.")
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
 
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    csv_files = sorted(args.data_dir.glob("BO_data_pull*.csv"))
-    if not csv_files:
-        log.error("No BO_data_pull*.csv files found in %s", args.data_dir)
-        return 2
-
-    log.info("Loading %d clinical CSV(s) from %s", len(csv_files), args.data_dir)
-    parts = []
-    for p in csv_files:
-        part = load_encounters(p)
-        log.info("  %s: %d encounters", p.name, len(part))
-        parts.append(part)
-    df_all = pd.concat(parts, ignore_index=True)
-    log.info("Concatenated: %d total encounters", len(df_all))
+    # Prefer the new master extract; fall back to the prior names for any
+    # local environment that still has them.
+    candidates = ["dashboard_data.csv", "clinical_data_v2.csv", "clinical_data.csv"]
+    master_csv: Path | None = None
+    for name in candidates:
+        p = args.data_dir / name
+        if p.exists():
+            master_csv = p
+            break
+    if master_csv is None:
+        # Last resort: glob the legacy per-FY files.
+        legacy = sorted(args.data_dir.glob("BO_data_pull*.csv"))
+        if not legacy:
+            log.error("No master clinical feed found in %s (checked %s)",
+                      args.data_dir, ", ".join(candidates))
+            return 2
+        log.info("Falling back to %d legacy per-FY CSV(s)", len(legacy))
+        parts = [load_encounters(p) for p in legacy]
+        df_all = pd.concat(parts, ignore_index=True)
+    else:
+        log.info("Using master CSV: %s", master_csv.name)
+        df_all = load_encounters(master_csv)
+    log.info("Loaded master feed: %d distinct encounters", len(df_all))
 
     df_all = compute_return_visits(df_all)
     top_conditions = _top_conditions(df_all)

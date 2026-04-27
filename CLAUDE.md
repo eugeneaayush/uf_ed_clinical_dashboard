@@ -19,25 +19,51 @@ Recharts. Python 3.12 + pandas for the pipeline.
 - `src/components/Shell.tsx` — masthead, footer, nav.
 
 ## Data
-- `data_raw/clinical_data.csv` — single master clinical feed, FY17 → present
-  (~973 MB, 1.46M rows). **Rows are not unique by Encounter # (CSN)** — the
-  export replicates identical rows for a subset of encounters. `load_encounters`
-  collapses each CSN to one row at load time (`drop_duplicates(keep="first")`),
-  yielding ~389K distinct encounters. Every downstream metric (counts, rates,
-  medians, groupings) then operates on one-row-per-encounter data automatically.
+- `data_raw/dashboard_data.csv` — single master clinical feed, FY17 → present
+  (~958 MB, 1.37M rows, 1.32M distinct `Encounter`). Rows are 1:1 with
+  encounters after a thin `drop_duplicates(["Encounter"])` pass (~3.9% pure
+  replication). FY26 (partial) ≈ 124K distinct encounters.
 - `data_raw/BO_billing_FY26.csv` + `BO_billing_FY17_FY25.csv` — encounter-billing
-  data (shared schema). Used in Phase 4 for charge/collection/RVU roll-ups.
-- UF fiscal year runs Jul 1 → Jun 30 (e.g. FY26 = Jul 1 2025 → Jun 30 2026).
-  `load_encounters` derives `fiscal_year` and `fy_quarter` columns from Arrival
-  DateTime.
-- **CSN-distinct semantics**: `Encounters` = `df["Encounter # (CSN)"].nunique()`.
-  `LWBS` = distinct CSNs with `LWBS Flag == "Y"`. Admits = distinct CSNs with
-  `Final ED Disposition ∈ {"ADMIT", "PRESENTED TO ADMIT SERVICE"}`. Discharges
-  = distinct CSNs with `Final ED Disposition == "DISCHARGE"`. Because dedup
-  runs at load time these all reduce to simple pandas ops — no per-metric
-  CSN-awareness logic needed.
+  data (shared schema). Reserved for Phase 4 (charge/collection/RVU roll-ups).
+- `icd10/icd10cm_codes_2026.txt` + `icd10cm_order_2026.txt` — CMS reference
+  used as a sanity check on the prefix patterns in `ICD10_CATEGORIES`.
+
+### Schema notes
+- New feed renames several columns; `load_encounters` applies `COLUMN_RENAMES`
+  immediately after `pd.read_csv` so the rest of the aggregator keeps using
+  canonical names (`Encounter #`, `MRN (UF)`, `ED Location`, `Acuity`,
+  `Arrival Mode Type`).
+- `ICD-10 Condition Category` is no longer pre-computed in the source. It's
+  derived in `classify_icd10` by prefix-matching the 5 `Final ED Impression
+  Dx*` decimal-code columns against `ICD10_CATEGORIES` (47 CCS-style buckets).
+  The first matching category wins for the back-compat string column;
+  `_cond_<slug>` boolean columns capture the full multi-label set.
+- New demographic columns surfaced on Summary: `sex` (MALE/FEMALE → `sex_norm`),
+  `age` (numeric, clamped 0-130 → `age_numeric`), `ped/adult` (A/P → `is_adult`
+  / `is_pediatric`).
+- Other new columns loaded but not yet rendered: ZIP Code, hospital service,
+  Minor Care Flag, CDU Flag/timestamps, Triage Start/End, ER Acknowledgement
+  timestamps, Fellow MD, Resident MD, NP, PA, RN, clinical comments.
+
+### Fiscal year
+UF fiscal year runs Jul 1 → Jun 30 (e.g. FY26 = Jul 1 2025 → Jun 30 2026).
+`load_encounters` derives `fiscal_year` and `fy_quarter` columns from Arrival
+DateTime.
+
+### Counting semantics
+`Encounters` = `df["Encounter #"].nunique()` after dedup.
+`LWBS` = encounters with `LWBS Flag == "Y"` (after dedup).
+Admits = encounters with `Final ED Disposition ∈ {"ADMIT", "PRESENTED TO ADMIT SERVICE"}`
+(`PRESENTED TO ADMIT SERVICE` is folded into `ADMIT` at load time via
+`ADMIT_DISPOSITION_ALIASES`).
+Discharges = encounters with `Final ED Disposition == "DISCHARGE"`.
+
+### Known gaps
 - BO pull lacks `Admit Unit` and `Admit Service` columns — MD→Order section
   in Daily Report shows a graceful empty state until those are added.
+- `Final Diagnosis`, `Action Financial Class`, `Work RVU`,
+  `Service/Billing Provider Type` columns were removed in the new feed.
+  Loader guards them with `if col in df.columns`.
 
 ## Payload layout
 The aggregator emits per-FY payload directories and mirrors the latest FY to

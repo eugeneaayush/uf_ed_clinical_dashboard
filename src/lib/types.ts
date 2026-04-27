@@ -126,6 +126,19 @@ export interface AcuityLocationRow {
   encounters: number;
 }
 
+export interface DemographicsBucket {
+  label: string;
+  value: number;
+  pct: number;
+}
+
+export interface SummaryDemographics {
+  age_mean: number | null;
+  age_median: number | null;
+  by_sex: DemographicsBucket[];
+  by_segment: DemographicsBucket[]; // Adult vs Pediatric
+}
+
 export interface SummaryPayload {
   kpis: SummaryKpi[];
   admissions_by_diagnosis: Labeled[];
@@ -135,6 +148,9 @@ export interface SummaryPayload {
   top_10_diagnoses: Labeled[];
   arrival_by_year: Array<Record<string, string | number>>;
   acuity_monthly: Array<Record<string, string | number>>;
+  /** Demographics block surfaced as 3 cards on the Summary page. Optional —
+   * older payloads from before the dashboard_data.csv migration won't have it. */
+  demographics?: SummaryDemographics;
 }
 
 // ===== Daily Activity Report (per ED location) =====
